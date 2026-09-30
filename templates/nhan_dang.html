@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Nhận dạng tứ giác · Tứ giác & Neo4j{% endblock %}
+{% block body %}
+<div class="grid2">
+  <form class="card form" method="get" action="/">
+    <h2>1. Giả thiết</h2>
+    <label class="lbl" for="hinh">Cho hình ban đầu</label>
+    <select id="hinh" name="hinh">
+      {% for h in hinh %}
+      <option value="{{ h.ma }}" {{ 'selected' if h.ma == ban_dau }}>{{ h.ten }} ABCD</option>
+      {% endfor %}
+    </select>
+
+    <p class="lbl">Có thêm các tính chất</p>
+    {% for ten_nhom, ds in nhom.items() %}
+    <fieldset>
+      <legend>{{ ten_nhom }}</legend>
+      {% for t in ds %}
+      <label class="chk"><input type="checkbox" name="tc" value="{{ t.ma }}" {{ 'checked' if t.ma in chon }}> {{ t.ten }}</label>
+      {% endfor %}
+    </fieldset>
+    {% endfor %}
+    <div class="btns">
+      <button type="submit" class="primary">Suy luận ⟶</button>
+      <a class="btn" href="/">Làm lại</a>
+    </div>
+  </form>
+
+  <section>
+    {% if not kq %}
+    <div class="card intro">
+      <h2>Tứ giác này là hình gì?</h2>
+      <p>Chọn hình ban đầu và các tính chất ở bên trái, rồi bấm <b>Suy luận</b>. Hệ thống sẽ truy vấn
+      đồ thị tri thức trong <b>Neo4j</b>, áp dụng lần lượt các <b>dấu hiệu nhận biết</b> cho đến khi không
+      suy ra được gì thêm, và cho biết hình cụ thể nhất cùng lời giải từng bước.</p>
+      <p class="muted">Ví dụ: chọn “Hình bình hành”, tích “Hai đường chéo vuông góc” và “Hai đường chéo bằng nhau”.</p>
+    </div>
+    {% else %}
+    <div class="card result {{ 'bad' if kq.mau_thuan }}">
+      <p class="lbl">2. Kết luận</p>
+      <p class="de">{{ ten_hinh[kq.hinh_ban_dau] }} ABCD{% if kq.gia_thiet %} có:
+        {% for t in kq.gia_thiet %}<span class="tag">{{ ten_tc[t] }}</span>{% endfor %}{% endif %}</p>
+      {% if kq.mau_thuan %}
+        <h1 class="kl">Giả thiết mâu thuẫn</h1>
+        {% for m in kq.mau_thuan %}
+        <div class="alert err">“{{ ten_tc[m.a] }}” và “{{ ten_tc[m.b] }}” không thể cùng xảy ra. {{ m.ly_do }}</div>
+        {% endfor %}
+      {% else %}
+        <h1 class="kl">⟹ {% for k in kq.ket_luan %}{{ ten_hinh[k] }}{{ ' và ' if not loop.last }}{% endfor %}</h1>
+        {% if kq.ket_luan == [kq.hinh_ban_dau] %}
+        <p class="muted">Các giả thiết chưa đủ để kết luận hình cụ thể hơn {{ ten_hinh[kq.hinh_ban_dau]|lower }}.</p>
+        {% endif %}
+      {% endif %}
+      {% for g in kq.goi_y %}
+      <div class="alert warn"><b>Lưu ý ({{ g.ma }}):</b> {{ g.ghi_chu }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <h2>3. Lời giải từng bước</h2>
+      {% if kq.buoc %}
+      <ol class="steps">
+        {% for b in kq.buoc %}
+        <li>
+          <span class="vong">Vòng {{ b.vong }}</span>
+          <b>{{ ten_hinh[b.ap_dung] }}</b>
+          {% for c in b.can %} + <span class="tc">{{ ten_tc[c] }}</span>
+            <small class="src">({% if b.nguon_tc[c] == 'giả thiết' %}giả thiết{% else %}tính chất của {% for s in b.nguon_tc[c] %}{{ ten_hinh[s] }}{{ ', ' if not loop.last }}{% endfor %}{% endif %})</small>
+          {% endfor %}
+          ⟹ <b class="to">{{ ten_hinh[b.ket_luan] }}</b>
+          <div class="rule">[{{ b.ma }}] {{ b.ten }}</div>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="muted">Không áp dụng được dấu hiệu nhận biết nào.</p>
+      {% endif %}
+      <p class="muted small">Bộ suy luận chạy {{ kq.so_vong }} vòng, dừng khi không còn dấu hiệu mới.</p>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <h2>Sơ đồ phân cấp</h2>
+      {% if kq %}<p class="legend"><span class="k bd"></span>hình ban đầu <span class="k on"></span>hình suy ra được <span class="k kl"></span>kết luận</p>{% endif %}
+      {{ svg|safe }}
+    </div>
+
+    {% if kq %}
+    <div class="card">
+      <h2>Mọi tính chất đã biết ({{ kq.tinh_chat|length }})</h2>
+      <ul class="props">
+        {% for t, nguon in kq.tinh_chat.items() %}
+        <li><span>{{ ten_tc[t] }}</span>
+          <small>{% if nguon == 'giả thiết' %}giả thiết{% else %}{% for s in nguon %}{{ ten_hinh[s] }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</small></li>
+        {% endfor %}
+      </ul>
+    </div>
+    <details class="card">
+      <summary><h2>Các câu Cypher đã chạy trên Neo4j</h2></summary>
+      {% for ten, cypher, so in store.log %}
+      <p class="lbl">{{ ten }} <small>(chạy {{ so }} lần)</small></p>
+      <pre>{{ cypher }}</pre>
+      {% endfor %}
+    </details>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

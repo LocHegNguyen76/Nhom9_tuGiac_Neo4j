@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ ct.hinh.ten }} · Tứ giác & Neo4j{% endblock %}
+{% block body %}
+<p class="crumb"><a href="/do-thi">Đồ thị tri thức</a> › {{ ct.hinh.ten }}</p>
+<div class="grid2 wide">
+  <section>
+    <div class="card">
+      <h1 class="kl">{{ ct.hinh.ten }}</h1>
+      <p><b>Định nghĩa.</b> {{ ct.hinh.dinh_nghia }}</p>
+      <p><b>Là một:</b>
+        {% for c in ct.cha if c.ma %}<a class="tag" href="/hinh/{{ c.ma }}">{{ c.ten }}</a>{% else %}<span class="muted">(hình tổng quát nhất)</span>{% endfor %}</p>
+      <p><b>Trường hợp đặc biệt:</b>
+        {% for c in ct.con if c.ma %}<a class="tag" href="/hinh/{{ c.ma }}">{{ c.ten }}</a>{% else %}<span class="muted">(không có)</span>{% endfor %}</p>
+      <p><a class="btn primary" href="/?hinh={{ ct.hinh.ma }}">Suy luận từ {{ ct.hinh.ten|lower }} ⟶</a></p>
+    </div>
+
+    <div class="card">
+      <h2>Dấu hiệu nhận biết ({{ nhan_biet|length }})</h2>
+      {% if nhan_biet %}
+      <table>
+        <tr><th>Mã</th><th>Từ hình</th><th>Cần thêm</th></tr>
+        {% for d in nhan_biet %}
+        <tr><td>{{ d.ma }}</td><td>{{ d.tu_hinh }}</td><td>{{ d.can|join(' + ') }}</td></tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">Đây là hình xuất phát.</p>{% endif %}
+    </div>
+
+    <div class="card">
+      <h2>Từ {{ ct.hinh.ten|lower }} có thể suy ra</h2>
+      {% if di_tiep %}
+      <table>
+        <tr><th>Mã</th><th>Nếu có thêm</th><th>Thì là</th></tr>
+        {% for d in di_tiep %}
+        <tr><td>{{ d.ma }}</td><td>{{ d.can|join(' + ') }}</td>
+          <td>{% if d.ket_luan %}<a href="/hinh/{{ d.ket_luan_ma }}">{{ d.ket_luan }}</a>{% else %}<i>chưa kết luận được (gợi ý)</i>{% endif %}</td></tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">Không có dấu hiệu nào đi tiếp (hình cụ thể nhất).</p>{% endif %}
+    </div>
+  </section>
+  <section>
+    <div class="card">
+      <h2>Tính chất ({{ tinh_chat|length }})</h2>
+      <ul class="props">
+        {% for t in tinh_chat %}
+        <li class="{{ 'own' if t.rieng }}"><span>{{ t.ten }}</span><small>{{ 'riêng' if t.rieng else 'kế thừa từ ' ~ t.tu_hinh|join(', ') }}</small></li>
+        {% else %}<li class="muted">Không có tính chất đặc biệt.</li>{% endfor %}
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Vị trí trong sơ đồ</h2>
+      {{ svg|safe }}
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Bài toán mẫu · Tứ giác & Neo4j{% endblock %}
+{% block body %}
+<div class="card">
+  <h2>Bài toán mẫu</h2>
+  <p class="muted">Mỗi dòng là một bài toán nhận dạng, được giải bằng bộ suy luận trên Neo4j. Bấm “Xem lời giải” để xem chi tiết.</p>
+  <table class="vd">
+    <tr><th>#</th><th>Đề bài</th><th>Kết luận</th><th></th></tr>
+    {% for v in ds %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ v.de }}</td>
+      <td>{% if v.kq.mau_thuan %}<span class="pill err">Mâu thuẫn</span>
+          {% elif v.kq.goi_y %}<span class="pill warn">{{ ten_hinh[v.kq.ket_luan[0]] }} (chưa đủ dữ kiện)</span>
+          {% else %}<span class="pill ok">{% for k in v.kq.ket_luan %}{{ ten_hinh[k] }}{% endfor %}</span>{% endif %}</td>
+      <td><a class="btn" href="/?hinh={{ v.hinh }}{% for t in v.tc %}&tc={{ t }}{% endfor %}">Xem lời giải</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

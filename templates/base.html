@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Tứ giác &amp; Neo4j{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 40 40" width="30" height="30" aria-hidden="true"><path d="M8 30 L14 9 L34 9 L28 30 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="8" cy="30" r="3.2"/><circle cx="14" cy="9" r="3.2"/><circle cx="34" cy="9" r="3.2"/><circle cx="28" cy="30" r="3.2"/></svg>
+    <div>
+      <b>Tứ giác &amp; Neo4j</b>
+      <small>Mô hình hoá tứ giác trong hình học phẳng</small>
+    </div>
+  </div>
+  <nav>
+    {% set ep = request.endpoint %}
+    <a href="/" class="{{ 'act' if ep == 'nhan_dang' }}">Nhận dạng</a>
+    <a href="/vi-du" class="{{ 'act' if ep == 'vi_du' }}">Bài toán mẫu</a>
+    <a href="/do-thi" class="{{ 'act' if ep in ('do_thi', 'tra_cuu') }}">Đồ thị tri thức</a>
+  </nav>
+  <span class="status"><i></i>Neo4j: {{ neo4j_uri }}</span>
+</header>
+<main>{% block body %}{% endblock %}</main>
+<footer>Đồ án: Mô hình hoá tứ giác trong hình học phẳng với Neo4j · Python + Flask + Cypher</footer>
+</body>
+</html>

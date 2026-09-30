@@ -1,0 +1,14 @@
+# Chạy Neo4j bằng Docker:  docker compose up -d
+services:
+  neo4j:
+    image: neo4j:5
+    container_name: neo4j-tu-giac
+    ports:
+      - "7474:7474"   # Neo4j Browser
+      - "7687:7687"   # Bolt (Python kết nối vào đây)
+    environment:
+      NEO4J_AUTH: neo4j/matkhau123
+    volumes:
+      - neo4j_data:/data
+volumes:
+  neo4j_data:
