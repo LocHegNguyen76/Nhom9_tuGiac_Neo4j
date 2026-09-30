@@ -12,6 +12,7 @@ from src.svg import so_do
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
+app.json.compact = False
 
 # Có thể thay bằng hàm chạy truy vấn khác (dùng khi kiểm thử)
 RUN = db.run
@@ -26,6 +27,20 @@ def q(cypher, **params):
         return RUN(cypher, **params)
     except Exception as e:  # noqa: BLE001
         raise Neo4jOffline(str(e)) from e
+
+
+def thu_tu_tinh_chat():
+    """Thứ tự chuẩn của tính chất (theo thuộc tính thu_tu trong Neo4j) để hiển thị ổn định."""
+    ds = q(repo.Q_DS_TINH_CHAT)
+    tt = {}
+    for i, t in enumerate(ds):
+        tt[t["ma"]] = i
+        tt[t["ten"]] = i
+    return ds, tt
+
+
+def sap_xep(ds, tt):
+    return sorted(ds, key=lambda x: tt.get(x, 999))
 
 
 def du_lieu_chung():
@@ -50,7 +65,7 @@ def inject():
 def nhan_dang():
     hinh, la_mot = du_lieu_chung()
     ten_hinh = {h["ma"]: h["ten"] for h in hinh}
-    tinh_chat = q(repo.Q_DS_TINH_CHAT)
+    tinh_chat, tt = thu_tu_tinh_chat()
     ten_tc = {t["ma"]: t["ten"] for t in tinh_chat}
     nhom = {}
     for t in tinh_chat:
@@ -66,6 +81,10 @@ def nhan_dang():
     if da_gui:
         store = Neo4jStore(q)
         kq = suy_luan(store, ban_dau, chon)
+        for b in kq.buoc:
+            b.can = sap_xep(b.can, tt)
+        gt = {t: v for t, v in kq.tinh_chat.items() if v == "giả thiết"}
+        kq.tinh_chat = {**gt, **{t: kq.tinh_chat[t] for t in sap_xep(kq.tinh_chat, tt) if t not in gt}}
 
     svg = so_do(hinh, la_mot,
                 suy_ra=kq.hinh_suy_ra if kq else (),
@@ -83,10 +102,18 @@ def tra_cuu(ma):
     if not rows:
         abort(404)
     ct = rows[0]
+    cot = {h["ma"]: h["cot"] for h in hinh}
+    ct["cha"] = sorted([c for c in ct["cha"] if c], key=lambda c: cot[c["ma"]])
+    ct["con"] = sorted([c for c in ct["con"] if c], key=lambda c: cot[c["ma"]])
     ten = ct["hinh"]["ten"]
+    _, tt = thu_tu_tinh_chat()
     tinh_chat = q(repo.Q_TINH_CHAT_CUA_HINH, ma=ma, ten=ten)
     nhan_biet = q(repo.Q_DAU_HIEU_NHAN_BIET, ma=ma)
     di_tiep = q(repo.Q_DAU_HIEU_DI_TIEP, ma=ma)
+    for d in nhan_biet + di_tiep:
+        d["can"] = sap_xep(d["can"], tt)
+    for t in tinh_chat:
+        t["tu_hinh"] = sorted(t["tu_hinh"])
     svg = so_do(hinh, la_mot, suy_ra=Neo4jStore(q).to_tien({ma}), ket_luan=[ma])
     return render_template("hinh.html", ct=ct, tinh_chat=tinh_chat, nhan_biet=nhan_biet,
                            di_tiep=di_tiep, svg=svg, hinh=hinh)
@@ -95,15 +122,19 @@ def tra_cuu(ma):
 @app.route("/do-thi")
 def do_thi():
     hinh, la_mot = du_lieu_chung()
+    _, tt = thu_tu_tinh_chat()
+    dau_hieu = q(repo.Q_DS_DAU_HIEU)
+    for d in dau_hieu:
+        d["can"] = sap_xep(d["can"], tt)
     return render_template("do_thi.html", svg=so_do(hinh, la_mot),
                            nut=q(repo.Q_THONG_KE_NUT), canh=q(repo.Q_THONG_KE_CANH),
-                           dau_hieu=q(repo.Q_DS_DAU_HIEU), truy_van=repo.TRUY_VAN_MAU)
+                           dau_hieu=dau_hieu, truy_van=repo.TRUY_VAN_MAU)
 
 
 @app.route("/vi-du")
 def vi_du():
     du_lieu_chung()
-    ten_tc = {t["ma"]: t["ten"] for t in q(repo.Q_DS_TINH_CHAT)}
+    ten_tc = {t["ma"]: t["ten"] for t in thu_tu_tinh_chat()[0]}
     ten_hinh = {h["ma"]: h["ten"] for h in q(repo.Q_DS_HINH)}
     ds = []
     for v in VI_DU:

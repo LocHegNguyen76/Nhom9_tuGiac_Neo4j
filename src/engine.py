@@ -73,21 +73,21 @@ class Neo4jStore:
         return self._run(cypher, **params)
 
     def to_tien(self, hinh):
-        return {r["ma"] for r in self._q("Tìm hình tổ tiên", Q_TO_TIEN, hinh=list(hinh))}
+        return {r["ma"] for r in self._q("Tìm hình tổ tiên", Q_TO_TIEN, hinh=sorted(hinh))}
 
     def tinh_chat_ke_thua(self, hinh):
-        rows = self._q("Tính chất kế thừa", Q_TINH_CHAT_KE_THUA, hinh=list(hinh))
+        rows = self._q("Tính chất kế thừa", Q_TINH_CHAT_KE_THUA, hinh=sorted(hinh))
         return {r["tc"]: sorted(r["tu_hinh"]) for r in rows}
 
     def dau_hieu_thoa(self, hinh, tinh_chat, da_dung):
-        return self._q("Dấu hiệu thoả mãn", Q_DAU_HIEU_THOA, hinh=list(hinh),
-                       tinh_chat=list(tinh_chat), da_dung=list(da_dung))
+        return self._q("Dấu hiệu thoả mãn", Q_DAU_HIEU_THOA, hinh=sorted(hinh),
+                       tinh_chat=sorted(tinh_chat), da_dung=sorted(da_dung))
 
     def mau_thuan(self, tinh_chat):
-        return self._q("Kiểm tra mâu thuẫn", Q_MAU_THUAN, tinh_chat=list(tinh_chat))
+        return self._q("Kiểm tra mâu thuẫn", Q_MAU_THUAN, tinh_chat=sorted(tinh_chat))
 
     def cu_the_nhat(self, hinh):
-        return [r["ma"] for r in self._q("Hình cụ thể nhất", Q_CU_THE_NHAT, hinh=list(hinh))]
+        return [r["ma"] for r in self._q("Hình cụ thể nhất", Q_CU_THE_NHAT, hinh=sorted(hinh))]
 
 
 class MemoryStore:
@@ -198,6 +198,9 @@ def suy_luan(store, hinh_ban_dau="TU_GIAC", gia_thiet=(), max_vong=50):
     kq.hinh_suy_ra = hinh
     kq.tinh_chat = tinh_chat
     kq.goi_y = [g for g in goi_y_tam if not set(g["tru_khi"] or []) & hinh]
-    kq.mau_thuan = store.mau_thuan(tinh_chat.keys())
+    mt = store.mau_thuan(tinh_chat.keys())
+    # Ưu tiên báo các cặp mâu thuẫn nằm ngay trong giả thiết người dùng chọn
+    truc_tiep = [m for m in mt if m["a"] in gia_thiet and m["b"] in gia_thiet]
+    kq.mau_thuan = truc_tiep or mt
     kq.ket_luan = store.cu_the_nhat(hinh)
     return kq

@@ -58,6 +58,9 @@
 
     <div class="card">
       <h2>3. Lời giải từng bước</h2>
+      {% if kq.mau_thuan %}
+      <p class="muted">Vì giả thiết mâu thuẫn nên không có hình tứ giác nào thoả mãn; các bước suy luận dưới đây chỉ để tham khảo.</p>
+      {% endif %}
       {% if kq.buoc %}
       <ol class="steps">
         {% for b in kq.buoc %}
