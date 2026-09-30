@@ -79,3 +79,19 @@ TRUY_VAN_MAU = [
     ("Đồ thị công thức của hình chữ nhật",
      "MATCH p = (:Hinh {ma: 'HINH_CHU_NHAT'})-[:CO_CONG_THUC]->(c:CongThuc)-[:TINH_RA|CAN_BIEN]->(:DaiLuong)\nRETURN p"),
 ]
+
+# ----- Trang Thử thách -----
+Q_LUU_LUOT_CHOI = """
+CREATE (l:LuotChoi {ten: $ten, diem: $diem, so_cau: $so_cau, thoi_diem: datetime()})
+WITH l
+UNWIND $hoan_thanh AS ma
+MATCH (h:Hinh {ma: ma})
+MERGE (l)-[:HOAN_THANH]->(h)
+RETURN count(*) AS so"""
+
+Q_BANG_XEP_HANG = """
+MATCH (l:LuotChoi)
+RETURN l.ten AS ten, l.diem AS diem, l.so_cau AS so_cau,
+       toString(date(l.thoi_diem)) AS ngay
+ORDER BY diem DESC, l.thoi_diem ASC
+LIMIT 10"""

@@ -9,6 +9,7 @@ from data.cong_thuc import VI_DU_TINH
 from data.knowledge import VI_DU
 from src import config, db, repo
 from src.engine import Neo4jStore, suy_luan
+from src.hinh_hoc import kiem_tra_hop_le, so_do as so_do_hinh, tinh_chat as tinh_chat_tu_toa_do
 from src.hinh_ve import ve
 from src.svg import so_do
 from src.tinh_toan import Q_CONG_THUC, Neo4jCongThuc, dinh_dang, tinh
@@ -256,6 +257,70 @@ def api_suy_luan():
         "goi_y": [g["ghi_chu"] for g in kq.goi_y],
         "mau_thuan": kq.mau_thuan,
     })
+
+
+# ---------------------------------------------------------------------------
+# Trang Thử thách: kéo thả 4 đỉnh để tạo đúng hình được yêu cầu
+# ---------------------------------------------------------------------------
+THU_TU_THU_THACH = ["HINH_THANG", "HINH_THANG_VUONG", "HINH_BINH_HANH", "HINH_CHU_NHAT",
+                    "HINH_THANG_CAN", "HINH_THOI", "HINH_DIEU", "HINH_VUONG"]
+
+
+@app.route("/thu-thach")
+def thu_thach():
+    hinh, _ = du_lieu_chung()
+    tinh_chat, tt = thu_tu_tinh_chat()
+    ten_hinh = {h["ma"]: h["ten"] for h in hinh}
+    dinh_nghia = {h["ma"]: h["dinh_nghia"] for h in hinh}
+    # Gợi ý = các dấu hiệu nhận biết lấy từ Neo4j
+    goi_y = {}
+    for d in q(repo.Q_DS_DAU_HIEU):
+        if d["ket_luan"]:
+            goi_y.setdefault(d["ket_luan"], []).append(
+                {"tu_hinh": d["tu_hinh"], "can": sap_xep(d["can"], tt)})
+    thu_thach_ds = [{"ma": m, "ten": ten_hinh[m], "dinh_nghia": dinh_nghia[m],
+                     "goi_y": goi_y.get(ten_hinh[m], [])} for m in THU_TU_THU_THACH if m in ten_hinh]
+    return render_template("thu_thach.html", thu_thach=thu_thach_ds, ten_hinh=ten_hinh,
+                           ten_tc={t["ma"]: t["ten"] for t in tinh_chat},
+                           thu_tu_tc=[t["ma"] for t in tinh_chat],
+                           bxh=q(repo.Q_BANG_XEP_HANG))
+
+
+@app.route("/api/thu-thach/kiem-tra")
+def api_kiem_tra():
+    """/api/thu-thach/kiem-tra?p=x1,y1,x2,y2,x3,y3,x4,y4  (toạ độ lưới, số nguyên)"""
+    try:
+        so = [int(x) for x in request.args.get("p", "").split(",")]
+    except ValueError:
+        so = []
+    if len(so) != 8 or any(abs(x) > 1000 for x in so):
+        return jsonify({"hop_le": False, "ly_do": "Toạ độ không hợp lệ."}), 400
+    pts = [(so[i], so[i + 1]) for i in range(0, 8, 2)]
+    ok, ly_do = kiem_tra_hop_le(pts)
+    if not ok:
+        return jsonify({"hop_le": False, "ly_do": ly_do})
+    tc = tinh_chat_tu_toa_do(pts)
+    kq = suy_luan(Neo4jStore(q), "TU_GIAC", tc)
+    return jsonify({
+        "hop_le": True, "tinh_chat": tc, "so_do": so_do_hinh(pts),
+        "ket_luan": kq.ket_luan, "hinh_suy_ra": sorted(kq.hinh_suy_ra),
+        "cac_buoc": [{"ma": b.ma, "ten": b.ten, "ket_luan": b.ket_luan} for b in kq.buoc],
+        "mau_thuan": kq.mau_thuan,
+    })
+
+
+@app.route("/api/thu-thach/luu", methods=["POST"])
+def api_luu_diem():
+    d = request.get_json(silent=True) or {}
+    ten = " ".join(str(d.get("ten", "")).split())[:30] or "Ẩn danh"
+    try:
+        diem = max(0, min(int(d.get("diem", 0)), 100000))
+        so_cau = max(0, min(int(d.get("so_cau", 0)), 1000))
+    except (TypeError, ValueError):
+        return jsonify({"loi": "Dữ liệu không hợp lệ"}), 400
+    hoan_thanh = [m for m in d.get("hoan_thanh", []) if m in THU_TU_THU_THACH]
+    q(repo.Q_LUU_LUOT_CHOI, ten=ten, diem=diem, so_cau=so_cau, hoan_thanh=hoan_thanh)
+    return jsonify({"ok": True, "bxh": q(repo.Q_BANG_XEP_HANG)})
 
 
 if __name__ == "__main__":

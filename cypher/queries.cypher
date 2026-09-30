@@ -59,3 +59,16 @@ WHERE all(c IN can WHERE c IN tc_biet)
 MATCH (d)-[:KET_LUAN]->(k:Hinh)
 RETURN d.ma AS dau_hieu, h.ten AS tu_hinh, can, k.ten AS ket_luan
 ORDER BY dau_hieu;
+
+// 12. Trò chơi Thử thách: bảng xếp hạng (nút :LuotChoi được tạo khi người chơi lưu điểm)
+MATCH (l:LuotChoi)
+OPTIONAL MATCH (l)-[:HOAN_THANH]->(h:Hinh)
+RETURN l.ten AS nguoi_choi, l.diem AS diem, l.so_cau AS so_hinh_dung,
+       collect(h.ten) AS da_tao_dung, toString(date(l.thoi_diem)) AS ngay
+ORDER BY diem DESC
+LIMIT 10;
+
+// 13. Hình nào được người chơi tạo đúng nhiều nhất?
+MATCH (:LuotChoi)-[:HOAN_THANH]->(h:Hinh)
+RETURN h.ten AS hinh, count(*) AS so_lan
+ORDER BY so_lan DESC;

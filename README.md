@@ -14,6 +14,12 @@ Ngoài ra, mỗi hình có **công thức diện tích, chu vi và các công th
 đường trung bình, góc, bán kính đường tròn nội/ngoại tiếp) lưu trong Neo4j. Trang **Tính diện tích, chu vi**
 cho nhập số liệu và tính ra kết quả kèm lời giải, đồng thời cảnh báo nếu số liệu không nhất quán.
 
+Trang **Thử thách** là một trò chơi: người chơi dùng chuột kéo 4 đỉnh A, B, C, D trên lưới ô vuông để
+tạo ra hình được yêu cầu (hình thang → hình thang vuông → hình bình hành → … → hình vuông). Mỗi lần thả
+chuột, toạ độ được đổi thành các tính chất (song song, bằng nhau, góc vuông, đường chéo…) rồi gửi cho bộ
+suy luận Neo4j. Neo4j kết luận đúng hình yêu cầu thì được cộng điểm và sang thử thách tiếp theo; điểm
+được lưu vào Neo4j (nút `:LuotChoi`) để hiện bảng xếp hạng.
+
 ## Công nghệ
 
 | Thành phần | Dùng |
@@ -58,6 +64,7 @@ data/cong_thuc.py      Đại lượng và công thức diện tích, chu vi, li
 src/seed.py            Nạp tri thức vào Neo4j / xuất file seed.cypher
 src/engine.py          Bộ suy luận tiến (các câu Cypher suy luận)
 src/tinh_toan.py       Bộ tính diện tích, chu vi từ công thức trong Neo4j
+src/hinh_hoc.py        Tính chất của tứ giác từ toạ độ 4 đỉnh (trang Thử thách)
 src/hinh_ve.py         Hình vẽ minh hoạ từng loại hình
 src/repo.py            Các câu Cypher tra cứu cho giao diện
 src/svg.py             Vẽ sơ đồ phân cấp
@@ -80,10 +87,12 @@ tests/                 Kiểm thử tự động (python -m unittest discover te
 (:Hinh)-[:CO_CONG_THUC]->(:CongThuc)       công thức của hình
 (:CongThuc)-[:CAN_BIEN]->(:DaiLuong)       biến đầu vào
 (:CongThuc)-[:TINH_RA]->(:DaiLuong)        biến kết quả
+(:LuotChoi)-[:HOAN_THANH]->(:Hinh)         lượt chơi Thử thách đã tạo đúng hình nào
 ```
 
 Dữ liệu: 9 hình, 17 tính chất, 26 dấu hiệu (25 luật kết luận + 1 luật gợi ý), 5 cặp mâu thuẫn,
 71 đại lượng, 68 công thức.
+Nút `:LuotChoi` được tạo khi người chơi lưu điểm ở trang Thử thách (không cần nạp lại dữ liệu).
 
 ## Thêm tri thức mới
 
