@@ -10,6 +10,10 @@ trả lời các câu hỏi dạng:
 
 …kèm lời giải từng bước, sơ đồ phân cấp và phát hiện giả thiết mâu thuẫn.
 
+Ngoài ra, mỗi hình có **công thức diện tích, chu vi và các công thức liên quan** (đường chéo, chiều cao,
+đường trung bình, góc, bán kính đường tròn nội/ngoại tiếp) lưu trong Neo4j. Trang **Tính diện tích, chu vi**
+cho nhập số liệu và tính ra kết quả kèm lời giải, đồng thời cảnh báo nếu số liệu không nhất quán.
+
 ## Công nghệ
 
 | Thành phần | Dùng |
@@ -50,8 +54,11 @@ rồi thử các câu trong `cypher/queries.cypher`.
 
 ```
 data/knowledge.py      Cơ sở tri thức: hình, tính chất, dấu hiệu nhận biết, ví dụ
+data/cong_thuc.py      Đại lượng và công thức diện tích, chu vi, liên quan
 src/seed.py            Nạp tri thức vào Neo4j / xuất file seed.cypher
 src/engine.py          Bộ suy luận tiến (các câu Cypher suy luận)
+src/tinh_toan.py       Bộ tính diện tích, chu vi từ công thức trong Neo4j
+src/hinh_ve.py         Hình vẽ minh hoạ từng loại hình
 src/repo.py            Các câu Cypher tra cứu cho giao diện
 src/svg.py             Vẽ sơ đồ phân cấp
 app.py                 Ứng dụng web Flask
@@ -69,10 +76,15 @@ tests/                 Kiểm thử tự động (python -m unittest discover te
 (:DauHieu)-[:CAN]->(:TinhChat)             ... và có các tính chất P ...
 (:DauHieu)-[:KET_LUAN]->(:Hinh)            ... thì là hình Y
 (:TinhChat)-[:MAU_THUAN]->(:TinhChat)      hai tính chất không thể cùng đúng
+(:Hinh)-[:CO_DAI_LUONG]->(:DaiLuong)       đại lượng của hình (a, d₁, h, S, P…)
+(:Hinh)-[:CO_CONG_THUC]->(:CongThuc)       công thức của hình
+(:CongThuc)-[:CAN_BIEN]->(:DaiLuong)       biến đầu vào
+(:CongThuc)-[:TINH_RA]->(:DaiLuong)        biến kết quả
 ```
 
-Dữ liệu: 9 hình, 17 tính chất, 26 dấu hiệu (25 luật kết luận + 1 luật gợi ý), 5 cặp mâu thuẫn.
+Dữ liệu: 9 hình, 17 tính chất, 26 dấu hiệu (25 luật kết luận + 1 luật gợi ý), 5 cặp mâu thuẫn,
+71 đại lượng, 68 công thức.
 
 ## Thêm tri thức mới
 
-Sửa `data/knowledge.py` (ví dụ thêm một dấu hiệu vào `DAU_HIEU`), rồi chạy lại `python -m src.seed`.
+Sửa `data/knowledge.py` (ví dụ thêm một dấu hiệu vào `DAU_HIEU`) hoặc `data/cong_thuc.py` (thêm công thức), rồi chạy lại `python -m src.seed`.

@@ -82,6 +82,22 @@
     </div>
     {% endif %}
 
+    {% if ct_kl %}
+    <div class="card">
+      <div class="card-head">
+        <h2>4. Công thức của {{ ten_hinh[kq.ket_luan[0]]|lower }}</h2>
+        <a class="btn primary" href="/tinh-toan?hinh={{ kq.ket_luan[0] }}">Nhập số liệu để tính ⟶</a>
+      </div>
+      <div class="ct-grid">
+        {% for loai, ds in ct_kl.items() %}
+        <div class="ct-nhom"><p class="lbl">{{ loai }}</p>
+          {% for c in ds %}<div class="ct">{{ c.hien_thi }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="card">
       <h2>Sơ đồ phân cấp</h2>
       {% if kq %}<p class="legend"><span class="k bd"></span>hình ban đầu <span class="k on"></span>hình suy ra được <span class="k kl"></span>kết luận</p>{% endif %}

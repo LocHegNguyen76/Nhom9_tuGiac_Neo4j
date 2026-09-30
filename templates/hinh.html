@@ -49,6 +49,19 @@
       </ul>
     </div>
     <div class="card">
+      <div class="card-head">
+        <h2>Công thức diện tích, chu vi và liên quan</h2>
+        <a class="btn primary" href="/tinh-toan?hinh={{ ct.hinh.ma }}">Tính toán ⟶</a>
+      </div>
+      <div class="ve-nho">{{ hinh_ve|safe }}</div>
+      {% for loai, ds in cong_thuc.items() %}
+      <p class="lbl">{{ loai }}</p>
+      <ul class="ct-list">
+        {% for c in ds %}<li><span class="ct">{{ c.hien_thi }}</span>{% if c.ghi_chu %} <small class="muted">{{ c.ghi_chu }}</small>{% endif %}</li>{% endfor %}
+      </ul>
+      {% endfor %}
+    </div>
+    <div class="card">
       <h2>Vị trí trong sơ đồ</h2>
       {{ svg|safe }}
     </div>

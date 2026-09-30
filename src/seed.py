@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+from data import cong_thuc as CT
 from data import knowledge as K
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -17,9 +18,12 @@ SCHEMA = [
     "CREATE CONSTRAINT hinh_ma IF NOT EXISTS FOR (h:Hinh) REQUIRE h.ma IS UNIQUE",
     "CREATE CONSTRAINT tinhchat_ma IF NOT EXISTS FOR (t:TinhChat) REQUIRE t.ma IS UNIQUE",
     "CREATE CONSTRAINT dauhieu_ma IF NOT EXISTS FOR (d:DauHieu) REQUIRE d.ma IS UNIQUE",
+    "CREATE CONSTRAINT dailuong_ma IF NOT EXISTS FOR (d:DaiLuong) REQUIRE d.ma IS UNIQUE",
+    "CREATE CONSTRAINT congthuc_ma IF NOT EXISTS FOR (c:CongThuc) REQUIRE c.ma IS UNIQUE",
 ]
 
-CLEAR = "MATCH (n) WHERE n:Hinh OR n:TinhChat OR n:DauHieu DETACH DELETE n"
+NHAN = ["Hinh", "TinhChat", "DauHieu", "DaiLuong", "CongThuc"]
+CLEAR = "MATCH (n) WHERE n:Hinh OR n:TinhChat OR n:DauHieu OR n:DaiLuong OR n:CongThuc DETACH DELETE n"
 
 # Mỗi câu lệnh: (cypher, tên tham số, dữ liệu)
 def build_statements():
@@ -78,6 +82,27 @@ def build_statements():
             MATCH (d:DauHieu {ma: r.ma}), (k:Hinh {ma: r.ket_luan})
             MERGE (d)-[:KET_LUAN]->(k)""",
          [d for d in dau_hieu if d["ket_luan"]]),
+        # ----- Công thức diện tích, chu vi, liên quan -----
+        ("""UNWIND $rows AS r
+            MATCH (h:Hinh {ma: r.hinh})
+            MERGE (d:DaiLuong {ma: r.ma})
+            SET d.bien = r.bien, d.ky_hieu = r.ky_hieu, d.ten = r.ten, d.kieu = r.kieu, d.thu_tu = r.thu_tu
+            MERGE (h)-[:CO_DAI_LUONG]->(d)""",
+         CT.ds_dai_luong()),
+        ("""UNWIND $rows AS r
+            MATCH (h:Hinh {ma: r.hinh})
+            MERGE (c:CongThuc {ma: r.ma})
+            SET c.loai = r.loai, c.loai_ten = r.loai_ten, c.hien_thi = r.hien_thi,
+                c.bieu_thuc = r.bieu_thuc, c.ghi_chu = r.ghi_chu, c.thu_tu = r.thu_tu
+            MERGE (h)-[:CO_CONG_THUC]->(c)
+            WITH c, r
+            MATCH (k:DaiLuong {ma: r.hinh + '.' + r.ket_qua})
+            MERGE (c)-[:TINH_RA]->(k)
+            WITH c, r
+            UNWIND r.vao AS bien
+            MATCH (v:DaiLuong {ma: r.hinh + '.' + bien})
+            MERGE (c)-[:CAN_BIEN]->(v)""",
+         CT.ds_cong_thuc()),
     ]
 
 
@@ -89,12 +114,12 @@ def seed(driver, database="neo4j", log=print):
         for cypher, rows in build_statements():
             s.run(cypher, rows=rows).consume()
         counts = s.run(
-            """MATCH (n) WHERE n:Hinh OR n:TinhChat OR n:DauHieu
+            """MATCH (n) WHERE n:Hinh OR n:TinhChat OR n:DauHieu OR n:DaiLuong OR n:CongThuc
                WITH labels(n)[0] AS nhan, count(*) AS so
                RETURN nhan, so ORDER BY nhan"""
         ).data()
         rels = s.run(
-            "MATCH (:Hinh|TinhChat|DauHieu)-[r]->() RETURN type(r) AS loai, count(*) AS so ORDER BY loai"
+            "MATCH (:Hinh|TinhChat|DauHieu|DaiLuong|CongThuc)-[r]->() RETURN type(r) AS loai, count(*) AS so ORDER BY loai"
         ).data()
     log("Đã nạp tri thức vào Neo4j:")
     for c in counts:

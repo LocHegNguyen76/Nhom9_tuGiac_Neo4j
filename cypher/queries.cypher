@@ -31,7 +31,21 @@ RETURN x.ten AS tu_hinh, k.ten AS thanh_hinh;
 MATCH (a:TinhChat)-[m:MAU_THUAN]->(b:TinhChat)
 RETURN a.ten, b.ten, m.ly_do;
 
-// 8. Một vòng suy luận thuần Cypher:
+// 8. Công thức diện tích và chu vi của mọi hình
+MATCH (h:Hinh)-[:CO_CONG_THUC]->(c:CongThuc)
+WHERE c.loai IN ['dien_tich', 'chu_vi']
+RETURN h.ten AS hinh, c.loai_ten AS loai, c.hien_thi AS cong_thuc
+ORDER BY h.cap, h.ten, c.thu_tu;
+
+// 9. Muốn tính diện tích hình thoi cần biết những đại lượng nào?
+MATCH (:Hinh {ma: 'HINH_THOI'})-[:CO_CONG_THUC]->(c:CongThuc)-[:TINH_RA]->(:DaiLuong {bien: 'S'})
+RETURN c.hien_thi AS cong_thuc, [(c)-[:CAN_BIEN]->(v) | v.ten] AS can_biet;
+
+// 10. Đồ thị công thức của hình chữ nhật
+MATCH p = (:Hinh {ma: 'HINH_CHU_NHAT'})-[:CO_CONG_THUC]->(c:CongThuc)-[:TINH_RA|CAN_BIEN]->(:DaiLuong)
+RETURN p;
+
+// 11. Một vòng suy luận thuần Cypher:
 //    Hình bình hành + hai đường chéo vuông góc + hai đường chéo bằng nhau
 //    -> những dấu hiệu nào áp dụng được ngay?
 WITH ['HINH_BINH_HANH'] AS hinh, ['CHEO_VUONG_GOC', 'CHEO_BANG'] AS gia_thiet

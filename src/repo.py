@@ -35,11 +35,11 @@ RETURN d.ma AS ma, d.ten AS ten, k.ten AS ket_luan, k.ma AS ket_luan_ma,
 ORDER BY d.ma"""
 
 Q_THONG_KE_NUT = """
-MATCH (n) WHERE n:Hinh OR n:TinhChat OR n:DauHieu
+MATCH (n) WHERE n:Hinh OR n:TinhChat OR n:DauHieu OR n:DaiLuong OR n:CongThuc
 RETURN labels(n)[0] AS nhan, count(*) AS so ORDER BY nhan"""
 
 Q_THONG_KE_CANH = """
-MATCH (a)-[r]->(b) WHERE (a:Hinh OR a:TinhChat OR a:DauHieu)
+MATCH (a)-[r]->(b) WHERE (a:Hinh OR a:TinhChat OR a:DauHieu OR a:CongThuc)
 RETURN type(r) AS loai, count(*) AS so ORDER BY loai"""
 
 Q_DS_DAU_HIEU = """
@@ -70,4 +70,12 @@ TRUY_VAN_MAU = [
      "MATCH (d)-[:AP_DUNG_CHO]->(x:Hinh)\nRETURN x.ten AS tu_hinh, k.ten AS thanh_hinh"),
     ("Các cặp tính chất mâu thuẫn",
      "MATCH (a:TinhChat)-[m:MAU_THUAN]->(b:TinhChat)\nRETURN a.ten, b.ten, m.ly_do"),
+    ("Công thức diện tích và chu vi của mọi hình",
+     "MATCH (h:Hinh)-[:CO_CONG_THUC]->(c:CongThuc)\nWHERE c.loai IN ['dien_tich', 'chu_vi']\n"
+     "RETURN h.ten AS hinh, c.loai_ten AS loai, c.hien_thi AS cong_thuc\nORDER BY h.cap, h.ten, c.thu_tu"),
+    ("Muốn tính diện tích hình thoi cần biết những đại lượng nào?",
+     "MATCH (:Hinh {ma: 'HINH_THOI'})-[:CO_CONG_THUC]->(c:CongThuc)-[:TINH_RA]->(:DaiLuong {bien: 'S'})\n"
+     "RETURN c.hien_thi AS cong_thuc, [(c)-[:CAN_BIEN]->(v) | v.ten] AS can_biet"),
+    ("Đồ thị công thức của hình chữ nhật",
+     "MATCH p = (:Hinh {ma: 'HINH_CHU_NHAT'})-[:CO_CONG_THUC]->(c:CongThuc)-[:TINH_RA|CAN_BIEN]->(:DaiLuong)\nRETURN p"),
 ]

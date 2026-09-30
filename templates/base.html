@@ -18,6 +18,7 @@
   <nav>
     {% set ep = request.endpoint %}
     <a href="/" class="{{ 'act' if ep == 'nhan_dang' }}">Nhận dạng</a>
+    <a href="/tinh-toan" class="{{ 'act' if ep == 'tinh_toan' }}">Tính diện tích, chu vi</a>
     <a href="/vi-du" class="{{ 'act' if ep == 'vi_du' }}">Bài toán mẫu</a>
     <a href="/do-thi" class="{{ 'act' if ep in ('do_thi', 'tra_cuu') }}">Đồ thị tri thức</a>
   </nav>

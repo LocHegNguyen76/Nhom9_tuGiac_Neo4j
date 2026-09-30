@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Tính diện tích, chu vi · Tứ giác & Neo4j{% endblock %}
+{% macro dv(kieu) -%}
+{%- if kieu == 'goc' -%}°{%- elif don_vi and kieu == 'dt' -%}&nbsp;{{ don_vi }}²{%- elif don_vi -%}&nbsp;{{ don_vi }}{%- endif -%}
+{%- endmacro %}
+{% block body %}
+<div class="grid2">
+  <form class="card form" method="get" action="/tinh-toan">
+    <h2>1. Chọn hình và nhập số liệu</h2>
+    <label class="lbl" for="hinh">Loại hình</label>
+    <select id="hinh" name="hinh" onchange="location='/tinh-toan?hinh='+this.value">
+      {% for h in hinh %}<option value="{{ h.ma }}" {{ 'selected' if h.ma == ma }}>{{ h.ten }} ABCD</option>{% endfor %}
+    </select>
+    <div class="ve">{{ hinh_ve|safe }}</div>
+    <p class="lbl">Số liệu đã biết <small>(để trống nếu chưa biết)</small></p>
+    <div class="inputs">
+      {% for d in dai_luong %}
+      <label class="inp">
+        <span class="ky">{{ d.ky_hieu }}</span>
+        <span class="ten">{{ d.ten }}</span>
+        <input type="text" inputmode="decimal" name="{{ d.bien }}" value="{{ gia_tri_form.get(d.bien, '') }}"
+               placeholder="{{ '°' if d.kieu == 'goc' else '' }}" autocomplete="off">
+      </label>
+      {% endfor %}
+    </div>
+    <label class="lbl" for="dv">Đơn vị độ dài</label>
+    <select id="dv" name="dv">
+      {% for u in DON_VI %}<option value="{{ u }}" {{ 'selected' if u == don_vi }}>{{ u or '(không ghi đơn vị)' }}</option>{% endfor %}
+    </select>
+    <input type="hidden" name="tinh" value="1">
+    <div class="btns">
+      <button type="submit" class="primary">Tính ⟶</button>
+      <a class="btn" href="/tinh-toan?hinh={{ ma }}&vd=1&dv={{ don_vi }}">Điền ví dụ</a>
+      <a class="btn" href="/tinh-toan?hinh={{ ma }}">Xoá</a>
+    </div>
+  </form>
+
+  <section>
+    {% if loi_dinh_dang %}
+    <div class="card">{% for l in loi_dinh_dang %}<div class="alert err">{{ l }}</div>{% endfor %}</div>
+    {% endif %}
+
+    {% if kq %}
+      {% if kq.loi_nhap %}
+      <div class="card result bad">
+        <p class="lbl">2. Kết quả</p>
+        <h1 class="kl">Dữ liệu không hợp lệ</h1>
+        {% for l in kq.loi_nhap %}<div class="alert err">{{ l }}</div>{% endfor %}
+      </div>
+      {% else %}
+      <div class="card result {{ 'bad' if kq.khong_nhat_quan }}">
+        <p class="lbl">2. Kết quả · {{ ten }}</p>
+        <div class="tiles">
+          {% for b, ten_b in [('S', 'Diện tích'), ('P', 'Chu vi')] %}
+          <div class="tile {{ 'none' if b not in kq.gia_tri }}">
+            <span>{{ ten_b }}</span>
+            {% if b in kq.gia_tri %}
+              <b>{{ b }} = {{ kq.gia_tri[b]|so }}{{ dv(kieu[b]) }}</b>
+              <small>{{ 'số liệu nhập' if kq.nguon[b] == 'nhập' else 'theo ' ~ ct_theo_ma[kq.nguon[b]].hien_thi }}</small>
+            {% else %}
+              <b>chưa tính được</b>
+              <small>Cần biết: {% for vao in can_cho[b] %}({{ vao|join(', ') }}){{ ' hoặc ' if not loop.last }}{% endfor %}</small>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% for x in kq.khong_nhat_quan %}
+        <div class="alert err"><b>Số liệu không nhất quán:</b> theo công thức <span class="ct">{{ x.ct.hien_thi }}</span>
+          thì {{ ky_hieu[x.ct.ket_qua] }} = {{ x.tinh_duoc|so }}, nhưng {{ 'bạn nhập' if x.nguon == 'nhập' else 'đã tính được' }}
+          {{ ky_hieu[x.ct.ket_qua] }} = {{ x.da_co|so }}. Hãy kiểm tra lại số liệu.</div>
+        {% endfor %}
+        {% if not kq.gia_tri %}<p class="muted">Hãy nhập ít nhất một số liệu rồi bấm Tính.</p>{% endif %}
+      </div>
+
+      <div class="card">
+        <h2>3. Bảng đại lượng</h2>
+        <table>
+          <tr><th>Ký hiệu</th><th>Đại lượng</th><th>Giá trị</th><th>Có được từ</th></tr>
+          {% for d in dai_luong %}
+          <tr class="{{ 'nhap' if kq.nguon.get(d.bien) == 'nhập' else ('' if d.bien in kq.gia_tri else 'chua') }}">
+            <td><b>{{ d.ky_hieu }}</b></td><td>{{ d.ten }}</td>
+            <td>{% if d.bien in kq.gia_tri %}<b>{{ kq.gia_tri[d.bien]|so }}</b>{{ dv(d.kieu) }}{% else %}–{% endif %}</td>
+            <td>{% if kq.nguon.get(d.bien) == 'nhập' %}số liệu nhập{% elif d.bien in kq.gia_tri %}<span class="ct">{{ ct_theo_ma[kq.nguon[d.bien]].hien_thi }}</span>{% else %}<span class="muted">chưa đủ dữ kiện</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>4. Lời giải từng bước</h2>
+        {% if kq.buoc %}
+        <ol class="steps">
+          {% for b in kq.buoc %}
+          <li>
+            <span class="vong">{{ b.ct.loai_ten }}</span>
+            Áp dụng <span class="ct">{{ b.ct.hien_thi }}</span>
+            {% if b.thay_so %}với {% for v, x in b.thay_so.items() %}{{ ky_hieu[v] }} = {{ x|so }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}
+            ⟹ <b class="to">{{ ky_hieu[b.ct.ket_qua] }} = {{ b.gia_tri|so }}{{ dv(kieu[b.ct.ket_qua]) }}</b>
+            {% if b.ct.ghi_chu %}<div class="rule">{{ b.ct.ghi_chu }}</div>{% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}
+        <p class="muted">Chưa áp dụng được công thức nào với số liệu đã nhập.</p>
+        {% endif %}
+        {% if kq.khong_ap_dung %}
+        <details class="small"><summary class="muted">Công thức không áp dụng được ({{ kq.khong_ap_dung|length }})</summary>
+          <ul>{% for x in kq.khong_ap_dung %}<li><span class="ct">{{ x.ct.hien_thi }}</span> – {{ x.ly_do }}</li>{% endfor %}</ul>
+        </details>
+        {% endif %}
+      </div>
+      {% endif %}
+    {% else %}
+    <div class="card intro">
+      <h2>Tính diện tích, chu vi và các đại lượng liên quan</h2>
+      <p>Chọn loại hình, nhập những số liệu đã biết (ví dụ chiều dài, chiều rộng, đường chéo, góc…) rồi bấm <b>Tính</b>.
+      Hệ thống lấy các công thức của hình đó từ <b>Neo4j</b> và áp dụng lần lượt cho đến khi không tính thêm được đại lượng nào,
+      kèm lời giải từng bước. Nếu số liệu mâu thuẫn nhau, hệ thống sẽ cảnh báo.</p>
+      <p class="muted">Bấm “Điền ví dụ” để thử nhanh với số liệu mẫu.</p>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <h2>Công thức của {{ ten|lower }} ({{ ct_theo_ma|length }})</h2>
+      <div class="ct-grid">
+        {% for loai, ds in cong_thuc.items() %}
+        <div class="ct-nhom"><p class="lbl">{{ loai }}</p>
+          {% for c in ds %}<div class="ct" title="{{ c.ghi_chu }}">{{ c.hien_thi }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <details class="small">
+        <summary class="muted">Câu Cypher lấy công thức từ Neo4j</summary>
+        <pre>{{ q_cong_thuc.strip() }}</pre>
+      </details>
+    </div>
+  </section>
+</div>
+{% endblock %}
