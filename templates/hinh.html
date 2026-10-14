@@ -61,10 +61,12 @@
       </ul>
       {% endfor %}
     </div>
-    <div class="card">
-      <h2>Vị trí trong sơ đồ</h2>
-      {{ svg|safe }}
-    </div>
   </section>
+</div>
+<div class="card">
+  <h2>Vị trí trong sơ đồ</h2>
+  <p class="legend"><span class="k kl"></span>{{ ct.hinh.ten }} <span class="k on"></span>hình tổng quát hơn
+    <span class="k cc"></span>hình đặc biệt hơn · mũi tên đi từ hình tổng quát xuống hình đặc biệt hơn</p>
+  {{ svg|safe }}
 </div>
 {% endblock %}

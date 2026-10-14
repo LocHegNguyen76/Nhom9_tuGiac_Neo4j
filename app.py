@@ -127,7 +127,8 @@ def nhan_dang():
     svg = so_do(hinh, la_mot,
                 suy_ra=kq.hinh_suy_ra if kq else (),
                 ket_luan=kq.ket_luan if kq else (),
-                ban_dau=ban_dau if kq else None)
+                ban_dau=ban_dau if kq else None,
+                buoc=[(b.ap_dung, b.ket_luan, b.ma) for b in kq.buoc] if kq else ())
     return render_template("nhan_dang.html", hinh=hinh, nhom=nhom, ban_dau=ban_dau,
                            chon=chon, kq=kq, store=store, ten_hinh=ten_hinh,
                            ten_tc=ten_tc, svg=svg, ct_kl=ct_kl)
@@ -152,7 +153,16 @@ def tra_cuu(ma):
         d["can"] = sap_xep(d["can"], tt)
     for t in tinh_chat:
         t["tu_hinh"] = sorted(t["tu_hinh"])
-    svg = so_do(hinh, la_mot, suy_ra=Neo4jStore(q).to_tien({ma}), ket_luan=[ma])
+    con_cua = {}
+    for c, p in la_mot:
+        con_cua.setdefault(p, []).append(c)
+    con_chau, ngan_xep = set(), [ma]
+    while ngan_xep:
+        for c in con_cua.get(ngan_xep.pop(), []):
+            if c not in con_chau:
+                con_chau.add(c)
+                ngan_xep.append(c)
+    svg = so_do(hinh, la_mot, suy_ra=Neo4jStore(q).to_tien({ma}) - {ma}, ket_luan=[ma], con_chau=con_chau)
     cong_thuc = nhom_cong_thuc(Neo4jCongThuc(q).cong_thuc(ma))
     return render_template("hinh.html", ct=ct, tinh_chat=tinh_chat, nhan_biet=nhan_biet,
                            di_tiep=di_tiep, svg=svg, hinh=hinh, cong_thuc=cong_thuc, hinh_ve=ve(ma))

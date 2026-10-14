@@ -40,3 +40,18 @@ class TestSoDo(unittest.TestCase):
         self.assertIn("+ 1 góc vuông", svg)
         self.assertIn("<polygon", svg)
         self.assertEqual(ve_so_do(HINH, self.canh), svg)      # kết quả ổn định (được nhớ lại)
+
+
+class TestSoDoPhanCap(unittest.TestCase):
+    """Sơ đồ phân cấp ở trang Nhận dạng / tra cứu."""
+
+    def test_ve_va_to_mau(self):
+        from src.engine import MemoryStore, suy_luan
+        from src.svg import so_do
+        kq = suy_luan(MemoryStore(K), "HINH_BINH_HANH", ["CHEO_VUONG_GOC", "CHEO_BANG"])
+        svg = so_do(HINH, K.LA_MOT, suy_ra=kq.hinh_suy_ra, ket_luan=kq.ket_luan, ban_dau="HINH_BINH_HANH",
+                    buoc=[(b.ap_dung, b.ket_luan, b.ma) for b in kq.buoc])
+        self.assertEqual(svg.count('href="/hinh/'), len(HINH))
+        self.assertEqual(svg.count('class="canh'), len(K.LA_MOT))
+        self.assertIn("DH20", svg)                     # bước HCN -> Hình vuông được ghi mã dấu hiệu
+        self.assertIn('class="nut on kl"', svg)        # hình vuông là kết luận

@@ -100,7 +100,9 @@
 
     <div class="card">
       <h2>Sơ đồ phân cấp</h2>
-      {% if kq %}<p class="legend"><span class="k bd"></span>hình ban đầu <span class="k on"></span>hình suy ra được <span class="k kl"></span>kết luận</p>{% endif %}
+      <p class="muted small">Mũi tên đi từ hình tổng quát xuống hình đặc biệt hơn. Bấm vào một hình để tra cứu.</p>
+      {% if kq %}<p class="legend"><span class="k bd"></span>hình ban đầu <span class="k on"></span>hình suy ra được
+        <span class="k kl"></span>kết luận <span class="k sl"></span>bước suy luận (mã dấu hiệu)</p>{% endif %}
       {{ svg|safe }}
     </div>
 
