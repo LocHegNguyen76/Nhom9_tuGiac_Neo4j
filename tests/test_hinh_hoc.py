@@ -63,5 +63,24 @@ class TestNhanDienTuToaDo(unittest.TestCase):
         self.assertFalse(kiem_tra_hop_le([(0, 0), (0, 0), (4, 4), (0, 4)])[0])   # trùng
 
 
+class TestSinhHinh(unittest.TestCase):
+    """Sinh hình mẫu cho chế độ Tự chọn đề: đúng loại, nằm trong lưới."""
+
+    def test_sinh_dung_loai(self):
+        import random
+        from src.hinh_hoc import sinh_hinh
+        for h in K.HINH:
+            ma = h["ma"]
+            for seed in range(15):
+                def dung(pts):
+                    tc = tinh_chat(pts)
+                    return not tc if ma == "TU_GIAC" else suy_luan(S, "TU_GIAC", tc).ket_luan == [ma]
+                pts = sinh_hinh(ma, dung, random.Random(seed))
+                self.assertIsNotNone(pts, ma)
+                self.assertTrue(kiem_tra_hop_le(pts)[0])
+                self.assertTrue(all(1 <= x <= 31 and 1 <= y <= 22 for x, y in pts), (ma, pts))
+                self.assertTrue(dung(pts))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,43 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Đồ thị tri thức · Tứ giác & Neo4j{% endblock %}
 {% block body %}
-<div class="stats">
-  {% for n in nut %}<div class="stat"><b>{{ n.so }}</b><span>nút :{{ n.nhan }}</span></div>{% endfor %}
-  {% for c in canh %}<div class="stat alt"><b>{{ c.so }}</b><span>:{{ c.loai }}</span></div>{% endfor %}
-</div>
-
-<div class="card">
-  <h2>Sơ đồ phân cấp (quan hệ <code>LA_MOT</code>)</h2>
-  <p class="muted">Mũi tên đi từ hình đặc biệt lên hình tổng quát hơn. Bấm vào một hình để tra cứu.</p>
+<div class="card sd-card">
+  <h2>Đồ thị tri thức: từ hình này suy ra hình kia</h2>
+  <p class="muted sd-chu-thich">Hình ở gốc mũi tên <b>+ điều kiện ghi trên mũi tên</b> ⇒ hình ở đầu mũi tên.
+    Mỗi dòng “+” là một cách, chỉ cần một. Bấm vào một hình để xem chi tiết, bấm vào ô điều kiện để thử kéo hình
+    trong trang Thử thách.</p>
   {{ svg|safe }}
-</div>
-
-<div class="card">
-  <h2>Lược đồ đồ thị</h2>
-  <pre class="schema">(:Hinh)-[:LA_MOT]->(:Hinh)
-(:Hinh)-[:CO_TINH_CHAT]->(:TinhChat)
-(:DauHieu)-[:AP_DUNG_CHO]->(:Hinh)       // điều kiện: hình ban đầu
-(:DauHieu)-[:CAN]->(:TinhChat)           // điều kiện: các tính chất
-(:DauHieu)-[:KET_LUAN]->(:Hinh)          // kết luận
-(:TinhChat)-[:MAU_THUAN]->(:TinhChat)</pre>
-</div>
-
-<div class="card">
-  <h2>Các dấu hiệu nhận biết ({{ dau_hieu|length }})</h2>
-  <table>
-    <tr><th>Mã</th><th>Từ hình</th><th>Cần thêm</th><th>Kết luận</th></tr>
-    {% for d in dau_hieu %}
-    <tr class="{{ 'gy' if d.loai == 'goi_y' }}"><td>{{ d.ma }}</td><td>{{ d.tu_hinh }}</td><td>{{ d.can|join(' + ') }}</td>
-      <td>{{ d.ket_luan or '(gợi ý: chưa đủ để kết luận)' }}</td></tr>
-    {% endfor %}
-  </table>
-</div>
-
-<div class="card">
-  <h2>Truy vấn mẫu để chạy trong Neo4j Browser</h2>
-  {% for ten, cypher in truy_van %}
-  <p class="lbl">{{ loop.index }}. {{ ten }}</p>
-  <pre>{{ cypher }}</pre>
-  {% endfor %}
 </div>
 {% endblock %}

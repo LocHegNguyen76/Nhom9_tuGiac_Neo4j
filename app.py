@@ -3,14 +3,18 @@
 
 Chạy:  python app.py      rồi mở http://localhost:5000
 """
+import threading
+import time
+
 from flask import Flask, abort, jsonify, render_template, request
 
 from data.cong_thuc import VI_DU_TINH
 from data.knowledge import VI_DU
 from src import config, db, repo
 from src.engine import Neo4jStore, suy_luan
-from src.hinh_hoc import kiem_tra_hop_le, so_do as so_do_hinh, tinh_chat as tinh_chat_tu_toa_do
+from src.hinh_hoc import kiem_tra_hop_le, sinh_hinh, so_do as so_do_hinh, tinh_chat as tinh_chat_tu_toa_do
 from src.hinh_ve import ve
+from src.so_do_tri_thuc import canh_suy_ra, ve_so_do
 from src.svg import so_do
 from src.tinh_toan import Q_CONG_THUC, Neo4jCongThuc, dinh_dang, tinh
 
@@ -57,12 +61,12 @@ def du_lieu_chung():
 
 @app.errorhandler(Neo4jOffline)
 def offline(e):
-    return render_template("offline.html", loi=str(e), uri=config.NEO4J_URI), 503
+    return render_template("offline.html", loi=str(e), uri=config.NEO4J_HIEN_THI), 503
 
 
 @app.context_processor
 def inject():
-    return {"neo4j_uri": config.NEO4J_URI}
+    return {"neo4j_uri": config.NEO4J_HIEN_THI}
 
 
 @app.template_filter("so")
@@ -223,13 +227,8 @@ def api_tinh_toan():
 @app.route("/do-thi")
 def do_thi():
     hinh, la_mot = du_lieu_chung()
-    _, tt = thu_tu_tinh_chat()
-    dau_hieu = q(repo.Q_DS_DAU_HIEU)
-    for d in dau_hieu:
-        d["can"] = sap_xep(d["can"], tt)
-    return render_template("do_thi.html", svg=so_do(hinh, la_mot),
-                           nut=q(repo.Q_THONG_KE_NUT), canh=q(repo.Q_THONG_KE_CANH),
-                           dau_hieu=dau_hieu, truy_van=repo.TRUY_VAN_MAU)
+    canh = canh_suy_ra(hinh, la_mot, q(repo.Q_SO_DO_SUY_RA))
+    return render_template("do_thi.html", svg=ve_so_do(hinh, canh))
 
 
 @app.route("/vi-du")
@@ -268,7 +267,7 @@ THU_TU_THU_THACH = ["HINH_THANG", "HINH_THANG_VUONG", "HINH_BINH_HANH", "HINH_CH
 
 @app.route("/thu-thach")
 def thu_thach():
-    hinh, _ = du_lieu_chung()
+    hinh, la_mot = du_lieu_chung()
     tinh_chat, tt = thu_tu_tinh_chat()
     ten_hinh = {h["ma"]: h["ten"] for h in hinh}
     dinh_nghia = {h["ma"]: h["dinh_nghia"] for h in hinh}
@@ -280,7 +279,11 @@ def thu_thach():
                 {"tu_hinh": d["tu_hinh"], "can": sap_xep(d["can"], tt)})
     thu_thach_ds = [{"ma": m, "ten": ten_hinh[m], "dinh_nghia": dinh_nghia[m],
                      "goi_y": goi_y.get(ten_hinh[m], [])} for m in THU_TU_THU_THACH if m in ten_hinh]
+    # Chế độ tự chọn: hình cho sẵn và các hình đặc biệt hơn có thể tạo ra từ nó (theo LA_MOT)
+    tu_chon = [{"ma": h["ma"], "ten": h["ten"], "dinh_nghia": h["dinh_nghia"],
+                "goi_y": goi_y.get(h["ten"], [])} for h in hinh]
     return render_template("thu_thach.html", thu_thach=thu_thach_ds, ten_hinh=ten_hinh,
+                           tu_chon=tu_chon, la_mot=la_mot,
                            ten_tc={t["ma"]: t["ten"] for t in tinh_chat},
                            thu_tu_tc=[t["ma"] for t in tinh_chat],
                            bxh=q(repo.Q_BANG_XEP_HANG))
@@ -309,18 +312,83 @@ def api_kiem_tra():
     })
 
 
+# Chống spam bảng xếp hạng khi chạy công khai trên web:
+#  - mỗi địa chỉ IP lưu tối đa 20 lượt / phút (cả lớp dùng chung Wi-Fi vẫn lưu được)
+#  - Neo4j chỉ giữ 2000 lượt chơi điểm cao nhất
+SO_LAN_LUU_MOI_PHUT = 20
+GIU_LAI_LUOT_CHOI = 2000
+_LAN_LUU = {}
+_KHOA_LUU = threading.Lock()
+
+
+def ip_nguoi_dung():
+    h = request.headers
+    ip = h.get("True-Client-IP") or h.get("CF-Connecting-IP") or h.get("X-Forwarded-For", "").split(",")[0]
+    return ip.strip() or request.remote_addr or "?"
+
+
+def duoc_luu(ip):
+    bay_gio = time.monotonic()
+    with _KHOA_LUU:
+        if len(_LAN_LUU) > 5000:
+            _LAN_LUU.clear()
+        gan_day = [t for t in _LAN_LUU.get(ip, []) if bay_gio - t < 60]
+        if len(gan_day) >= SO_LAN_LUU_MOI_PHUT:
+            _LAN_LUU[ip] = gan_day
+            return False
+        _LAN_LUU[ip] = gan_day + [bay_gio]
+        return True
+
+
+@app.route("/api/thu-thach/hinh-mau")
+def api_hinh_mau():
+    """/api/thu-thach/hinh-mau?hinh=HINH_BINH_HANH -> toạ độ một hình bình hành ngẫu nhiên trên lưới.
+    Hình sinh ra được kiểm tra lại bằng bộ suy luận Neo4j: Neo4j phải kết luận đúng loại hình đó."""
+    ma = request.args.get("hinh", "TU_GIAC")
+    hinh, _ = du_lieu_chung()
+    if ma not in {h["ma"] for h in hinh}:
+        return jsonify({"loi": "Không có loại hình này."}), 400
+
+    def dung_loai(pts):
+        tc = tinh_chat_tu_toa_do(pts)
+        if ma == "TU_GIAC":
+            return not tc                 # tứ giác thường: chưa có tính chất đặc biệt nào
+        return suy_luan(Neo4jStore(q), "TU_GIAC", tc).ket_luan == [ma]
+
+    pts = sinh_hinh(ma, dung_loai)
+    if not pts:
+        return jsonify({"loi": "Chưa sinh được hình, hãy thử lại."}), 503
+    return jsonify({"hinh": ma, "pts": pts})
+
+
 @app.route("/api/thu-thach/luu", methods=["POST"])
 def api_luu_diem():
-    d = request.get_json(silent=True) or {}
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict):
+        return jsonify({"loi": "Dữ liệu không hợp lệ"}), 400
     ten = " ".join(str(d.get("ten", "")).split())[:30] or "Ẩn danh"
     try:
         diem = max(0, min(int(d.get("diem", 0)), 100000))
         so_cau = max(0, min(int(d.get("so_cau", 0)), 1000))
     except (TypeError, ValueError):
         return jsonify({"loi": "Dữ liệu không hợp lệ"}), 400
-    hoan_thanh = [m for m in d.get("hoan_thanh", []) if m in THU_TU_THU_THACH]
+    hoan_thanh = d.get("hoan_thanh")
+    hoan_thanh = [m for m in hoan_thanh if m in THU_TU_THU_THACH] if isinstance(hoan_thanh, list) else []
+    if not duoc_luu(ip_nguoi_dung()):
+        return jsonify({"loi": "Lưu điểm quá nhiều lần, hãy đợi một phút rồi thử lại."}), 429
     q(repo.Q_LUU_LUOT_CHOI, ten=ten, diem=diem, so_cau=so_cau, hoan_thanh=hoan_thanh)
+    q(repo.Q_DON_LUOT_CHOI, giu_lai=GIU_LAI_LUOT_CHOI)
     return jsonify({"ok": True, "bxh": q(repo.Q_BANG_XEP_HANG)})
+
+
+@app.route("/suc-khoe")
+def suc_khoe():
+    """Kiểm tra web và Neo4j còn chạy. Dùng cho dịch vụ ping định kỳ (giữ web và Neo4j Aura luôn thức)."""
+    try:
+        so_hinh = RUN(repo.Q_SUC_KHOE)[0]["so_hinh"]
+    except Exception:  # noqa: BLE001
+        return jsonify({"web": True, "neo4j": False}), 503
+    return jsonify({"web": True, "neo4j": True, "so_hinh": so_hinh})
 
 
 if __name__ == "__main__":

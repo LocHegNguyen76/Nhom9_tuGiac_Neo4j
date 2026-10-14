@@ -2,9 +2,11 @@
 Nạp cơ sở tri thức (data/knowledge.py) vào Neo4j.
 
 Chạy:  python -m src.seed
+       python -m src.seed --neu-can                     (chỉ nạp khi chưa có / tri thức đã đổi)
        python -m src.seed --export cypher/seed.cypher   (chỉ xuất file .cypher, không cần Neo4j)
 """
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -53,7 +55,8 @@ def build_statements():
          hinh),
         ("""UNWIND $rows AS r
             MERGE (t:TinhChat {ma: r.ma})
-            SET t.ten = r.ten, t.nhom = r.nhom, t.nhom_ten = r.nhom_ten, t.thu_tu = r.thu_tu""",
+            SET t.ten = r.ten, t.ten_ngan = r.ngan, t.nhom = r.nhom, t.nhom_ten = r.nhom_ten,
+                t.thu_tu = r.thu_tu""",
          tinh_chat),
         ("""UNWIND $rows AS r
             MATCH (c:Hinh {ma: r.con}), (p:Hinh {ma: r.cha})
@@ -106,13 +109,38 @@ def build_statements():
     ]
 
 
-def seed(driver, database="neo4j", log=print):
+def van_tay():
+    """Dấu vân tay của bộ tri thức: đổi khi data/knowledge.py hoặc data/cong_thuc.py đổi."""
+    goc = json.dumps([SCHEMA, CLEAR, build_statements()], ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(goc.encode("utf-8")).hexdigest()[:16]
+
+
+Q_DOC_VAN_TAY = """
+OPTIONAL MATCH (p:PhienBan {ma: 'tri_thuc'})
+WITH p
+OPTIONAL MATCH (h:Hinh)
+RETURN p.van_tay AS van_tay, count(h) AS so_hinh"""
+
+Q_GHI_VAN_TAY = """
+MERGE (p:PhienBan {ma: 'tri_thuc'})
+SET p.van_tay = $van_tay, p.cap_nhat = datetime()"""
+
+
+def can_nap(driver, database=None):
+    """True nếu Neo4j chưa có tri thức hoặc tri thức đã cũ so với mã nguồn."""
+    with driver.session(database=database) as s:
+        r = s.run(Q_DOC_VAN_TAY).single()
+    return not r or r["so_hinh"] == 0 or r["van_tay"] != van_tay()
+
+
+def seed(driver, database=None, log=print):
     with driver.session(database=database) as s:
         for q in SCHEMA:
             s.run(q).consume()
         s.run(CLEAR).consume()
         for cypher, rows in build_statements():
             s.run(cypher, rows=rows).consume()
+        s.run(Q_GHI_VAN_TAY, van_tay=van_tay()).consume()
         counts = s.run(
             """MATCH (n) WHERE n:Hinh OR n:TinhChat OR n:DauHieu OR n:DaiLuong OR n:CongThuc
                WITH labels(n)[0] AS nhan, count(*) AS so
@@ -173,6 +201,8 @@ def export_cypher(path):
 def main():
     ap = argparse.ArgumentParser(description="Nạp tri thức tứ giác vào Neo4j")
     ap.add_argument("--export", metavar="FILE", help="Chỉ xuất file .cypher")
+    ap.add_argument("--neu-can", action="store_true",
+                    help="Chỉ nạp khi Neo4j chưa có tri thức hoặc tri thức đã đổi (dùng khi triển khai lên web)")
     args = ap.parse_args()
     if args.export:
         export_cypher(args.export)
@@ -187,7 +217,10 @@ def main():
         print(f"Không kết nối được Neo4j tại {config.NEO4J_URI}: {e}", file=sys.stderr)
         print("Hãy kiểm tra Neo4j đã chạy và mật khẩu trong file .env.", file=sys.stderr)
         sys.exit(1)
-    seed(driver, config.NEO4J_DATABASE)
+    if args.neu_can and not can_nap(driver, config.NEO4J_DATABASE):
+        print("Neo4j đã có tri thức mới nhất — bỏ qua bước nạp.")
+    else:
+        seed(driver, config.NEO4J_DATABASE)
     driver.close()
 
 

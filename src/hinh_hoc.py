@@ -107,3 +107,132 @@ def tinh_chat(pts):
                           or phan_giac(B, A, C, D) or phan_giac(D, A, C, B),
     }
     return [k for k, v in tc.items() if v]
+
+
+# ---------------------------------------------------------------------------
+# Sinh ngẫu nhiên một tứ giác thuộc đúng một loại (dùng cho trang Thử thách)
+# Toạ độ nguyên trong lưới 1..31 x 1..22 (giống bảng vẽ trên trang web).
+# ---------------------------------------------------------------------------
+LUOI_X, LUOI_Y = (1, 31), (1, 22)
+
+# Hướng của cạnh đáy: nằm ngang hoặc nghiêng theo các vectơ nguyên nhỏ
+HUONG = [(1, 0), (0, 1), (1, 1), (1, -1), (2, 1), (1, 2), (2, -1), (1, -2),
+         (3, 1), (1, 3), (3, -1), (1, -3), (3, 2), (2, 3), (3, -2), (2, -3)]
+
+# Các nhóm vectơ có cùng độ dài (để dựng hình thoi có toạ độ nguyên)
+CUNG_DO_DAI = [
+    [(5, 0), (0, 5), (3, 4), (4, 3), (-3, 4), (-4, 3)],
+    [(4, 2), (2, 4), (-2, 4), (-4, 2)],
+    [(6, 3), (3, 6), (-3, 6), (-6, 3)],
+    [(3, 1), (1, 3), (-1, 3), (-3, 1)],
+    [(6, 2), (2, 6), (-2, 6), (-6, 2)],
+    [(3, 2), (2, 3), (-2, 3), (-3, 2)],
+    [(6, 4), (4, 6), (-4, 6), (-6, 4)],
+    [(5, 5), (7, 1), (1, 7), (-1, 7), (-7, 1), (-5, 5)],
+    [(8, 1), (7, 4), (4, 7), (1, 8), (-1, 8), (-4, 7), (-7, 4), (-8, 1)],
+]
+
+
+def _cong(*vs):
+    return (sum(v[0] for v in vs), sum(v[1] for v in vs))
+
+
+def _nhan(k, v):
+    return (k * v[0], k * v[1])
+
+
+def _boi(u, lo, hi, R):
+    """Hệ số nguyên m sao cho độ dài m·u nằm trong [lo, hi]."""
+    d = math.hypot(*u)
+    ms = [m for m in range(1, 40) if lo <= m * d <= hi]
+    return R.choice(ms) if ms else max(1, round(lo / d))
+
+
+def _ung_vien(ma, R):
+    u = (1, 0) if R.random() < 0.4 else R.choice(HUONG)
+    n = (-u[1], u[0])
+    O = (0, 0)
+    if ma == "TU_GIAC":
+        pts = []
+        for a0 in (135, 45, -45, -135):
+            a = math.radians(a0 + R.uniform(-20, 20))
+            r = R.uniform(5, 10)
+            pts.append((round(16 + r * math.cos(a) * 1.3), round(11.5 + r * math.sin(a))))
+        return pts
+    if ma in ("HINH_THANG", "HINH_THANG_VUONG", "HINH_THANG_CAN"):
+        a = _boi(u, 10, 17, R)
+        if ma == "HINH_THANG_CAN":
+            bs = [b for b in range(1, a) if (a - b) % 2 == 0 and b * math.hypot(*u) >= 4]
+        else:
+            bs = [b for b in range(1, a) if b * math.hypot(*u) >= 4]
+        if not bs:
+            return None
+        b = R.choice(bs)
+        t = _boi(n, 5, 10, R)
+        if ma == "HINH_THANG":
+            p = R.choice([x for x in range(-2, a - b + 3) if x not in (0, a - b, (a - b) / 2)] or [1])
+        elif ma == "HINH_THANG_VUONG":
+            p = R.choice([0, a - b])
+        else:
+            p = (a - b) // 2
+        w = _cong(_nhan(p, u), _nhan(t, n))
+        return [O, _nhan(a, u), _cong(w, _nhan(b, u)), w]
+    if ma in ("HINH_BINH_HANH", "HINH_CHU_NHAT"):
+        a = _boi(u, 8, 15, R)
+        t = _boi(n, 5, 10, R)
+        p = 0 if ma == "HINH_CHU_NHAT" else R.choice([-3, -2, -1, 1, 2, 3])
+        w = _cong(_nhan(p, u), _nhan(t, n))
+        return [O, _nhan(a, u), _cong(_nhan(a, u), w), w]
+    if ma == "HINH_VUONG":
+        m = _boi(u, 6, 11, R)
+        return [O, _nhan(m, u), _cong(_nhan(m, u), _nhan(m, n)), _nhan(m, n)]
+    if ma == "HINH_THOI":
+        nhom = R.choice(CUNG_DO_DAI)
+        cap = [(v, w) for v in nhom for w in nhom if _cross(v, w) > 0 and _dot(v, w) != 0]
+        v, w = R.choice(cap)
+        k = max(1, round(R.uniform(6, 9) / math.hypot(*v)))
+        v, w = _nhan(k, v), _nhan(k, w)
+        return [O, v, _cong(v, w), w]
+    if ma == "HINH_DIEU":
+        L = _boi(u, 10, 16, R)
+        ms = [m for m in range(1, L) if 2 * m != L and 0.15 * L <= m <= 0.85 * L]
+        m = R.choice(ms)
+        r = _boi(n, 3, 7, R)
+        return [O, _cong(_nhan(m, u), _nhan(r, n)), _nhan(L, u), _cong(_nhan(m, u), _nhan(-r, n))]
+    return None
+
+
+def _dat_vao_luoi(pts, R):
+    """Dịch hình vào giữa lưới (toạ độ nguyên); None nếu hình quá to."""
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    lo_x, hi_x = LUOI_X[0] + 1 - min(xs), LUOI_X[1] - 1 - max(xs)
+    lo_y, hi_y = LUOI_Y[0] + 1 - min(ys), LUOI_Y[1] - 1 - max(ys)
+    if lo_x > hi_x or lo_y > hi_y:
+        return None
+    gx, gy = (lo_x + hi_x) / 2, (lo_y + hi_y) / 2
+    dx = round(min(hi_x, max(lo_x, gx + R.uniform(-2, 2))))
+    dy = round(min(hi_y, max(lo_y, gy + R.uniform(-1.5, 1.5))))
+    return [(x + dx, y + dy) for x, y in pts]
+
+
+def sinh_hinh(ma, dung_loai, R=None, so_lan=60):
+    """
+    Sinh toạ độ một tứ giác thuộc loại `ma`.
+    dung_loai(pts) -> bool: hàm kiểm tra cuối cùng (trang web dùng bộ suy luận Neo4j).
+    Trả về list 4 điểm hoặc None.
+    """
+    import random
+
+    R = R or random.Random()
+    for _ in range(so_lan):
+        pts = _ung_vien(ma, R)
+        if not pts:
+            continue
+        if R.random() < 0.5:                       # lật ngẫu nhiên cho đa dạng
+            pts = [(x, -y) for x, y in pts]
+        pts = _dat_vao_luoi(pts, R)
+        if not pts or not kiem_tra_hop_le(pts)[0]:
+            continue
+        if dung_loai(pts):
+            return [list(p) for p in pts]
+    return None

@@ -95,3 +95,19 @@ RETURN l.ten AS ten, l.diem AS diem, l.so_cau AS so_cau,
        toString(date(l.thoi_diem)) AS ngay
 ORDER BY diem DESC, l.thoi_diem ASC
 LIMIT 10"""
+
+# Chỉ giữ $giu_lai lượt chơi điểm cao nhất (tránh đầy giới hạn của Neo4j Aura Free)
+Q_DON_LUOT_CHOI = """
+MATCH (l:LuotChoi)
+WITH l ORDER BY l.diem DESC, l.thoi_diem ASC
+SKIP $giu_lai
+DETACH DELETE l"""
+
+Q_SUC_KHOE = "MATCH (h:Hinh) RETURN count(h) AS so_hinh"
+
+# Sơ đồ tri thức: mỗi dấu hiệu có kết luận -> (từ hình, đến hình, các tính chất cần thêm)
+Q_SO_DO_SUY_RA = """
+MATCH (d:DauHieu)-[:AP_DUNG_CHO]->(x:Hinh), (d)-[:KET_LUAN]->(k:Hinh)
+RETURN d.ma AS ma, d.ten AS ten, x.ma AS tu, k.ma AS den,
+       [(d)-[:CAN]->(t:TinhChat) | {ma: t.ma, ngan: coalesce(t.ten_ngan, t.ten), thu_tu: t.thu_tu}] AS can
+ORDER BY ma"""

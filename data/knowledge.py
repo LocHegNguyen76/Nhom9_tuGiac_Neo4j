@@ -66,29 +66,30 @@ LA_MOT = [
 
 # ---------------------------------------------------------------------------
 # 2. CÁC TÍNH CHẤT NGUYÊN TỬ (giả thiết người dùng có thể chọn)
+#    "ngan": tên ngắn ghi trên mũi tên của sơ đồ ở trang Đồ thị tri thức
 #    nhom: canh | goc | duong_cheo
 # ---------------------------------------------------------------------------
 TINH_CHAT = [
     # --- Cạnh ---
-    {"ma": "SS_1_CAP", "nhom": "canh", "ten": "Có một cặp cạnh đối song song"},
-    {"ma": "SS_2_CAP", "nhom": "canh", "ten": "Hai cặp cạnh đối song song"},
-    {"ma": "BANG_2_CAP", "nhom": "canh", "ten": "Hai cặp cạnh đối bằng nhau"},
-    {"ma": "SS_VA_BANG", "nhom": "canh", "ten": "Có một cặp cạnh đối vừa song song vừa bằng nhau"},
-    {"ma": "CANH_BEN_BANG", "nhom": "canh", "ten": "Cặp cạnh còn lại (hai cạnh bên) bằng nhau"},
-    {"ma": "CANH_BEN_KHONG_SS", "nhom": "canh", "ten": "Hai cạnh bên không song song"},
-    {"ma": "HAI_CANH_KE_BANG", "nhom": "canh", "ten": "Có hai cạnh kề bằng nhau"},
-    {"ma": "HAI_CAP_KE_BANG", "nhom": "canh", "ten": "Hai cặp cạnh kề bằng nhau (AB = AD, CB = CD)"},
-    {"ma": "BON_CANH_BANG", "nhom": "canh", "ten": "Bốn cạnh bằng nhau"},
+    {"ma": "SS_1_CAP", "nhom": "canh", "ten": "Có một cặp cạnh đối song song", "ngan": "1 cặp cạnh đối song song"},
+    {"ma": "SS_2_CAP", "nhom": "canh", "ten": "Hai cặp cạnh đối song song", "ngan": "2 cặp cạnh đối song song"},
+    {"ma": "BANG_2_CAP", "nhom": "canh", "ten": "Hai cặp cạnh đối bằng nhau", "ngan": "2 cặp cạnh đối bằng nhau"},
+    {"ma": "SS_VA_BANG", "nhom": "canh", "ten": "Có một cặp cạnh đối vừa song song vừa bằng nhau", "ngan": "1 cặp cạnh đối song song và bằng nhau"},
+    {"ma": "CANH_BEN_BANG", "nhom": "canh", "ten": "Cặp cạnh còn lại (hai cạnh bên) bằng nhau", "ngan": "2 cạnh bên bằng nhau"},
+    {"ma": "CANH_BEN_KHONG_SS", "nhom": "canh", "ten": "Hai cạnh bên không song song", "ngan": "2 cạnh bên không song song"},
+    {"ma": "HAI_CANH_KE_BANG", "nhom": "canh", "ten": "Có hai cạnh kề bằng nhau", "ngan": "2 cạnh kề bằng nhau"},
+    {"ma": "HAI_CAP_KE_BANG", "nhom": "canh", "ten": "Hai cặp cạnh kề bằng nhau (AB = AD, CB = CD)", "ngan": "2 cặp cạnh kề bằng nhau"},
+    {"ma": "BON_CANH_BANG", "nhom": "canh", "ten": "Bốn cạnh bằng nhau", "ngan": "4 cạnh bằng nhau"},
     # --- Góc ---
-    {"ma": "MOT_GOC_VUONG", "nhom": "goc", "ten": "Có một góc vuông"},
-    {"ma": "BA_GOC_VUONG", "nhom": "goc", "ten": "Có ba góc vuông"},
-    {"ma": "GOC_DOI_BANG", "nhom": "goc", "ten": "Các góc đối bằng nhau"},
-    {"ma": "GOC_KE_DAY_BANG", "nhom": "goc", "ten": "Hai góc kề một đáy bằng nhau"},
+    {"ma": "MOT_GOC_VUONG", "nhom": "goc", "ten": "Có một góc vuông", "ngan": "1 góc vuông"},
+    {"ma": "BA_GOC_VUONG", "nhom": "goc", "ten": "Có ba góc vuông", "ngan": "3 góc vuông"},
+    {"ma": "GOC_DOI_BANG", "nhom": "goc", "ten": "Các góc đối bằng nhau", "ngan": "các góc đối bằng nhau"},
+    {"ma": "GOC_KE_DAY_BANG", "nhom": "goc", "ten": "Hai góc kề một đáy bằng nhau", "ngan": "2 góc kề 1 đáy bằng nhau"},
     # --- Đường chéo ---
-    {"ma": "CHEO_TRUNG_DIEM", "nhom": "duong_cheo", "ten": "Hai đường chéo cắt nhau tại trung điểm mỗi đường"},
-    {"ma": "CHEO_BANG", "nhom": "duong_cheo", "ten": "Hai đường chéo bằng nhau"},
-    {"ma": "CHEO_VUONG_GOC", "nhom": "duong_cheo", "ten": "Hai đường chéo vuông góc với nhau"},
-    {"ma": "CHEO_PHAN_GIAC", "nhom": "duong_cheo", "ten": "Có một đường chéo là đường phân giác của một góc"},
+    {"ma": "CHEO_TRUNG_DIEM", "nhom": "duong_cheo", "ten": "Hai đường chéo cắt nhau tại trung điểm mỗi đường", "ngan": "2 đường chéo cắt nhau tại trung điểm"},
+    {"ma": "CHEO_BANG", "nhom": "duong_cheo", "ten": "Hai đường chéo bằng nhau", "ngan": "2 đường chéo bằng nhau"},
+    {"ma": "CHEO_VUONG_GOC", "nhom": "duong_cheo", "ten": "Hai đường chéo vuông góc với nhau", "ngan": "2 đường chéo vuông góc"},
+    {"ma": "CHEO_PHAN_GIAC", "nhom": "duong_cheo", "ten": "Có một đường chéo là đường phân giác của một góc", "ngan": "1 đường chéo là phân giác 1 góc"},
 ]
 
 NHOM_TEN = {"canh": "Về cạnh", "goc": "Về góc", "duong_cheo": "Về đường chéo"}

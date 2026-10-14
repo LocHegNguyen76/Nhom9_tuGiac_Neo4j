@@ -3,10 +3,21 @@
 {% block body %}
 <div class="tt-grid">
   <section class="card tt-main">
+    <div class="tt-modes" role="tablist" aria-label="Chế độ chơi">
+      <button type="button" class="tt-mode act" data-che-do="vong" role="tab">Theo vòng · 8 thử thách</button>
+      <button type="button" class="tt-mode" data-che-do="tu_chon" role="tab">Tự chọn đề</button>
+    </div>
+    <div class="tt-tuchon" id="tt-tuchon" hidden>
+      <label>Hình cho sẵn <select id="tc-tu"></select></label>
+      <span class="tt-mui" aria-hidden="true">⟶</span>
+      <label>Cần tạo thành <select id="tc-den"></select></label>
+      <button type="button" class="primary" id="tc-bat-dau">Bắt đầu</button>
+    </div>
+
     <div class="tt-head">
       <div>
-        <p class="lbl">Thử thách <span id="tt-so">1</span>/<span id="tt-tong">{{ thu_thach|length }}</span> · Vòng <span id="tt-vong">1</span></p>
-        <h1 class="tt-target">Hãy kéo các đỉnh để tạo thành <span id="tt-ten">…</span></h1>
+        <p class="lbl" id="tt-nhan">Thử thách 1/{{ thu_thach|length }} · Vòng 1</p>
+        <h1 class="tt-target" id="tt-de">Hãy kéo các đỉnh để tạo thành <span>…</span></h1>
         <p class="muted small" id="tt-dn"></p>
       </div>
       <div class="tt-clock"><span id="tt-time">0:00</span><small>thời gian</small></div>
@@ -28,6 +39,7 @@
           </div>
           <div class="btns">
             <button class="primary" id="md-nut">Thử thách tiếp theo ⟶</button>
+            <button id="md-nut-phu" hidden></button>
             <button id="md-nut-2" hidden>Lưu điểm</button>
           </div>
         </div>
@@ -35,7 +47,14 @@
     </div>
 
     <p class="tt-legend"><span class="k1"></span>cặp cạnh AB ∥ CD <span class="k2"></span>cặp cạnh BC ∥ DA
-      <span class="k3"></span>góc vuông · số trên cạnh là độ dài (đơn vị: ô lưới) · kéo các chấm tròn A, B, C, D</p>
+      <span class="k3"></span>góc vuông · số trên cạnh là độ dài (đơn vị: ô lưới)</p>
+    <p class="tt-cach-keo">
+      <b>Cách kéo:</b> kéo <b>chấm tròn</b> để dời một đỉnh · kéo <b>cạnh</b> để dời cả cạnh (cạnh giữ nguyên hướng)
+      · kéo <b>phần tô màu</b> để dời cả hình · bấm chọn một đỉnh hoặc cạnh rồi nhấn
+      <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> để nhích từng ô.
+      <span id="tt-giai-thich-goi-y">Khi chọn một đỉnh: <span class="g1">nét đứt màu</span> = đặt đỉnh lên đó sẽ có cặp cạnh
+      song song, <span class="g2">nét chấm xám</span> = có góc vuông, <span class="g3">vòng tròn</span> = thành hình bình hành.</span>
+    </p>
     <div class="tt-status" id="tt-status">
       <span class="lbl">Neo4j nhận dạng:</span> <b id="tt-hien-tai">…</b>
       <span id="tt-msg" class="tt-msg"></span>
@@ -45,6 +64,7 @@
       <button id="nut-hinh-moi">Hình mới</button>
       <button id="nut-bo-qua">Bỏ qua</button>
       <label class="chk tt-chk"><input type="checkbox" id="hien-cheo" checked> Hiện đường chéo</label>
+      <label class="chk tt-chk"><input type="checkbox" id="hien-goi-y" checked> Đường gợi ý</label>
       <button id="nut-ket-thuc" class="tt-end">Kết thúc &amp; lưu điểm</button>
     </div>
   </section>
@@ -55,7 +75,7 @@
       <div><b id="chuoi">0</b><span>chuỗi đúng</span></div>
       <div><b id="da-xong">0</b><span>đã xong</span></div>
     </div>
-    <div class="card">
+    <div class="card" id="the-tien-do">
       <p class="lbl">Tiến độ vòng này</p>
       <div class="tt-dots" id="tt-dots"></div>
     </div>
@@ -81,15 +101,32 @@
 </div>
 
 <script>
-const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc, "thu_tu_tc": thu_tu_tc, "bxh": bxh}|tojson }};
+const DATA = {{ {"thu_thach": thu_thach, "tu_chon": tu_chon, "la_mot": la_mot, "ten_hinh": ten_hinh,
+                 "ten_tc": ten_tc, "thu_tu_tc": thu_tu_tc, "bxh": bxh}|tojson }};
 (function () {
-  const G = 20, COT = 32, HANG = 23, NS = "http://www.w3.org/2000/svg";
+  const G = 20, COT = 32, HANG = 23;
   const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const bang = $("bang"), lopVe = $("ve");
+  const HINH = Object.fromEntries(DATA.tu_chon.map(h => [h.ma, h]));
+  const THU_TU = Object.fromEntries(DATA.tu_chon.map((h, i) => [h.ma, i]));
+
+  // Hình con cháu theo quan hệ LA_MOT (các hình đặc biệt hơn)
+  const con = {};
+  DATA.la_mot.forEach(([c, p]) => (con[p] = con[p] || []).push(c));
+  function hauDue(ma) {
+    const kq = [], st = [ma], gap = new Set([ma]);
+    while (st.length) (con[st.pop()] || []).forEach(c => { if (!gap.has(c)) { gap.add(c); kq.push(c); st.push(c); } });
+    return kq.sort((a, b) => THU_TU[a] - THU_TU[b]);
+  }
+
+  let cheDo = "vong";                       // "vong" | "tu_chon"
   let ds = DATA.thu_thach.slice(), idx = 0, vong = 1;
+  let tuChon = null, luot = 1;              // {tu, den}
   let diem = 0, chuoi = 0, daXong = new Set(), soCau = 0;
-  let pts = [], keo = null, dungGoiY = false, batDau = Date.now(), daGiai = false, dangNghi = false;
-  let yeuCau = 0, henGio = null, ketQua = null, daXongVong = new Set();
+  let pts = [], keo = null, chon = null, dungGoiY = false, batDau = Date.now(), daGiai = false, dangNghi = false;
+  let yeuCau = 0, henGio = null, henNop = null, ketQua = null, daXongVong = new Set(), lanSinh = 0;
+  const muc = () => (cheDo === "vong" ? ds[idx] : HINH[tuChon.den]);
 
   // ---------- lưới ----------
   let g = "";
@@ -97,7 +134,7 @@ const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc,
   for (let y = 0; y <= HANG; y++) g += `<line x1="0" y1="${y * G}" x2="${COT * G}" y2="${y * G}" class="l${y % 5 ? "" : " dam"}"/>`;
   $("luoi").innerHTML = g;
 
-  // ---------- hình học hiển thị (độ dài, góc, song song) ----------
+  // ---------- hình học hiển thị ----------
   const v = (p, q) => [q[0] - p[0], q[1] - p[1]];
   const cross = (a, b) => a[0] * b[1] - a[1] * b[0];
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
@@ -105,18 +142,42 @@ const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc,
   const goc = (a, b) => Math.acos(Math.max(-1, Math.min(1, dot(a, b) / (len(a) * len(b))))) * 180 / Math.PI;
   const so = x => (Math.abs(x - Math.round(x)) < 1e-9 ? String(Math.round(x)) : x.toFixed(2)).replace(".", ",");
 
+  // Đường gợi ý khi chọn/kéo đỉnh i
+  function veGoiY(i) {
+    const n0 = pts[(i + 3) % 4], n1 = pts[(i + 1) % 4], o = pts[(i + 2) % 4];
+    let s = "";
+    const duong = (p, d, cls) => {
+      const L = 80 / (len(d) || 1);
+      s += `<line x1="${(p[0] - d[0] * L) * G}" y1="${(p[1] - d[1] * L) * G}" x2="${(p[0] + d[0] * L) * G}" y2="${(p[1] + d[1] * L) * G}" class="${cls}"/>`;
+    };
+    const vg = d => [-d[1], d[0]];
+    duong(n0, vg(v(n0, o)), "goi-y vg");                 // góc vuông tại đỉnh kề trước
+    duong(n1, vg(v(n1, o)), "goi-y vg");                 // góc vuông tại đỉnh kề sau
+    duong(n1, v(o, n0), "goi-y ss" + (i % 2 ? "2" : "1"));        // cạnh (i, i+1) song song cạnh đối
+    duong(n0, v(o, n1), "goi-y ss" + ((i + 1) % 2 ? "2" : "1"));  // cạnh (i-1, i) song song cạnh đối
+    const hbh = [n0[0] + n1[0] - o[0], n0[1] + n1[1] - o[1]];
+    if (hbh[0] >= 1 && hbh[0] <= COT - 1 && hbh[1] >= 1 && hbh[1] <= HANG - 1)
+      s += `<circle cx="${hbh[0] * G}" cy="${hbh[1] * G}" r="8" class="goi-y-diem"><title>Đặt đỉnh vào đây thì được hình bình hành</title></circle>`;
+    return s;
+  }
+
   function ve() {
+    if (pts.length < 4) { lopVe.innerHTML = ""; return; }
     const [A, B, C, D] = pts, P = pts.map(p => [p[0] * G, p[1] * G]);
     const canh = [[0, 1], [1, 2], [2, 3], [3, 0]];
     const ssAC = cross(v(A, B), v(C, D)) === 0, ssBD = cross(v(B, C), v(D, A)) === 0;
     const cx = (P[0][0] + P[1][0] + P[2][0] + P[3][0]) / 4, cy = (P[0][1] + P[1][1] + P[2][1] + P[3][1]) / 4;
-    let s = `<polygon points="${P.map(p => p.join(",")).join(" ")}" class="da"/>`;
+    const dinhDangChon = keo && keo.loai === "dinh" ? keo.i : (chon && chon.loai === "dinh" ? chon.i : null);
+    let s = `<polygon points="${P.map(p => p.join(",")).join(" ")}" class="da${chon && chon.loai === "hinh" ? " chon" : ""}"/>`;
+    if ($("hien-goi-y").checked && dinhDangChon !== null) s += veGoiY(dinhDangChon);
     if ($("hien-cheo").checked) {
       s += `<line x1="${P[0][0]}" y1="${P[0][1]}" x2="${P[2][0]}" y2="${P[2][1]}" class="cheo"/>`;
       s += `<line x1="${P[1][0]}" y1="${P[1][1]}" x2="${P[3][0]}" y2="${P[3][1]}" class="cheo"/>`;
     }
     canh.forEach(([i, j], k) => {
       const ss = (k % 2 === 0 ? ssAC : ssBD);
+      const dangChon = (chon && chon.loai === "canh" && chon.i === k) || (keo && keo.loai === "canh" && keo.i === k);
+      if (dangChon) s += `<line x1="${P[i][0]}" y1="${P[i][1]}" x2="${P[j][0]}" y2="${P[j][1]}" class="canh-chon"/>`;
       s += `<line x1="${P[i][0]}" y1="${P[i][1]}" x2="${P[j][0]}" y2="${P[j][1]}" class="canh${ss ? (k % 2 ? " ss2" : " ss1") : ""}"/>`;
       const mx = (P[i][0] + P[j][0]) / 2, my = (P[i][1] + P[j][1]) / 2;
       const d = Math.hypot(mx - cx, my - cy) || 1;
@@ -135,33 +196,98 @@ const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc,
       s += `<text x="${x + ux * 34}" y="${y + uy * 34}" class="so-goc${vuong ? " vuong" : ""}">${so(a).replace(",00", "")}°</text>`;
       s += `<text x="${x - ux * 22}" y="${y - uy * 22}" class="ten-dinh">${"ABCD"[i]}</text>`;
     });
-    pts.forEach((p, i) => { s += `<circle cx="${p[0] * G}" cy="${p[1] * G}" r="12" class="dinh${keo === i ? " keo" : ""}" data-i="${i}"/>`; });
+    // Vùng bấm vào cạnh (rộng, trong suốt) để kéo cả cạnh
+    canh.forEach(([i, j], k) => {
+      s += `<line x1="${P[i][0]}" y1="${P[i][1]}" x2="${P[j][0]}" y2="${P[j][1]}" class="tay-canh" data-c="${k}"><title>Kéo để dời cả cạnh ${"ABCD"[i]}${"ABCD"[j]}</title></line>`;
+    });
+    pts.forEach((p, i) => {
+      const cls = "dinh" + (keo && keo.loai === "dinh" && keo.i === i ? " keo" : "") + (dinhDangChon === i ? " chon" : "");
+      s += `<circle cx="${p[0] * G}" cy="${p[1] * G}" r="12" class="${cls}" data-i="${i}"><title>Kéo để dời đỉnh ${"ABCD"[i]}</title></circle>`;
+    });
     lopVe.innerHTML = s;
   }
 
-  // ---------- kéo thả ----------
-  function veLuoi(e) {
+  // ---------- kéo thả: đỉnh, cạnh, cả hình ----------
+  function diemLuoi(e, kep) {
     const pt = bang.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
     const m = pt.matrixTransform(bang.getScreenCTM().inverse());
-    return [Math.min(COT - 1, Math.max(1, Math.round(m.x / G))), Math.min(HANG - 1, Math.max(1, Math.round(m.y / G)))];
+    let p = [Math.round(m.x / G), Math.round(m.y / G)];
+    if (kep) p = [Math.min(COT - 1, Math.max(1, p[0])), Math.min(HANG - 1, Math.max(1, p[1]))];
+    return p;
+  }
+  const chiSo = dt => (dt.loai === "dinh" ? [dt.i] : dt.loai === "canh" ? [dt.i, (dt.i + 1) % 4] : [0, 1, 2, 3]);
+  // Dời các đỉnh của dt thêm (dx, dy) tính từ toạ độ gốc; giữ trong lưới, không cho hai đỉnh trùng nhau
+  function doi(dt, dx, dy, gocPts) {
+    const ids = chiSo(dt);
+    const xs = ids.map(k => gocPts[k][0]), ys = ids.map(k => gocPts[k][1]);
+    dx = Math.max(1 - Math.min(...xs), Math.min(COT - 1 - Math.max(...xs), dx));
+    dy = Math.max(1 - Math.min(...ys), Math.min(HANG - 1 - Math.max(...ys), dy));
+    const moi = gocPts.map((p, k) => (ids.includes(k) ? [p[0] + dx, p[1] + dy] : p.slice()));
+    for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++)
+      if (moi[a][0] === moi[b][0] && moi[a][1] === moi[b][1]) return false;
+    if (moi.every((p, k) => p[0] === pts[k][0] && p[1] === pts[k][1])) return false;
+    pts = moi;
+    return true;
   }
   bang.addEventListener("pointerdown", e => {
-    const t = e.target.closest("[data-i]");
-    if (!t || daGiai || dangNghi) return;
-    keo = +t.dataset.i; bang.setPointerCapture(e.pointerId); ve();
+    if (daGiai || dangNghi || pts.length < 4) return;
+    const t = e.target;
+    let dt = null;
+    if (t.dataset && t.dataset.i !== undefined) dt = { loai: "dinh", i: +t.dataset.i };
+    else if (t.dataset && t.dataset.c !== undefined) dt = { loai: "canh", i: +t.dataset.c };
+    else if (t.classList && t.classList.contains("da")) dt = { loai: "hinh" };
+    chon = dt;
+    if (!dt) { ve(); return; }
+    keo = Object.assign({}, dt, { goc: diemLuoi(e, false), ptsGoc: pts.map(p => p.slice()) });
+    bang.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    ve();
   });
   bang.addEventListener("pointermove", e => {
-    if (keo === null) return;
-    const p = veLuoi(e);
-    if (p[0] === pts[keo][0] && p[1] === pts[keo][1]) return;
-    if (pts.some((q, j) => j !== keo && q[0] === p[0] && q[1] === p[1])) return;
-    pts[keo] = p; ve();
+    if (!keo) return;
+    let doiDuoc;
+    if (keo.loai === "dinh") {
+      const p = diemLuoi(e, true), g0 = keo.ptsGoc[keo.i];
+      doiDuoc = doi(keo, p[0] - g0[0], p[1] - g0[1], keo.ptsGoc);
+    } else {
+      const p = diemLuoi(e, false);
+      doiDuoc = doi(keo, p[0] - keo.goc[0], p[1] - keo.goc[1], keo.ptsGoc);
+    }
+    if (!doiDuoc) return;
+    keo.daDoi = true;
+    ve();
     clearTimeout(henGio); henGio = setTimeout(() => phanTich(false), 120);
   });
-  const tha = () => { if (keo === null) return; keo = null; ve(); clearTimeout(henGio); phanTich(true); };
+  // Thả chuột: chỉ chấm khi hình có thay đổi (bấm để chọn thì không chấm)
+  const tha = () => {
+    if (!keo) return;
+    const daDoi = keo.daDoi;
+    keo = null; ve();
+    if (daDoi) { clearTimeout(henGio); phanTich(true); }
+  };
   bang.addEventListener("pointerup", tha);
   bang.addEventListener("pointercancel", tha);
   $("hien-cheo").addEventListener("change", ve);
+  $("hien-goi-y").addEventListener("change", () => { $("tt-giai-thich-goi-y").hidden = !$("hien-goi-y").checked; ve(); });
+
+  // Bàn phím: nhích đỉnh / cạnh / cả hình đang chọn từng ô
+  document.addEventListener("keydown", e => {
+    if (!chon || daGiai || dangNghi || pts.length < 4) return;
+    const el = document.activeElement;
+    if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
+    if (e.key === "Escape") { chon = null; ve(); return; }
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    if (!doi(chon, d[0], d[1], pts.map(p => p.slice()))) return;
+    ve();
+    clearTimeout(henGio); henGio = setTimeout(() => phanTich(false), 80);
+    clearTimeout(henNop); henNop = setTimeout(() => phanTich(true), 700);   // dừng tay 0,7 giây thì chấm
+  });
+  // Bấm ra ngoài bảng thì bỏ chọn (bắt ở pha capture, trước khi bảng vẽ lại)
+  document.addEventListener("pointerdown", e => {
+    if (chon && !bang.contains(e.target) && !e.target.closest("button, label, select, input")) { chon = null; ve(); }
+  }, true);
 
   // ---------- gọi Neo4j ----------
   async function kiemTra(p) {
@@ -169,6 +295,7 @@ const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc,
     return r.json();
   }
   async function phanTich(cuoi) {
+    if (pts.length < 4) return;
     const ma = ++yeuCau;
     let r;
     try { r = await kiemTra(pts); } catch (e) { $("tt-msg").textContent = "Không gọi được máy chủ."; return; }
@@ -180,25 +307,29 @@ const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc,
   function hienKetQua(r) {
     const tc = new Set(r.tinh_chat || []);
     $("ds-tinh-chat").innerHTML = DATA.thu_tu_tc.map(m =>
-      `<li class="${tc.has(m) ? "co" : ""}">${tc.has(m) ? "✓" : "·"} ${DATA.ten_tc[m]}</li>`).join("");
+      `<li class="${tc.has(m) ? "co" : ""}">${tc.has(m) ? "✓" : "·"} ${esc(DATA.ten_tc[m])}</li>`).join("");
     if (!r.hop_le) {
       $("tt-hien-tai").textContent = "không hợp lệ";
-      $("ds-buoc").innerHTML = `<li class="muted">${r.ly_do}</li>`;
+      $("ds-buoc").innerHTML = `<li class="muted">${esc(r.ly_do)}</li>`;
       return;
     }
     $("tt-hien-tai").textContent = r.ket_luan.map(tenHinh).join(" và ");
     $("ds-buoc").innerHTML = r.cac_buoc.length
-      ? r.cac_buoc.map(b => `<li><b>${tenHinh(b.ket_luan)}</b><small>[${b.ma}] ${b.ten}</small></li>`).join("")
+      ? r.cac_buoc.map(b => `<li><b>${esc(tenHinh(b.ket_luan))}</b><small>[${esc(b.ma)}] ${esc(b.ten)}</small></li>`).join("")
       : `<li class="muted">Chưa áp dụng được dấu hiệu nào: đây là tứ giác thường.</li>`;
   }
   function danhGia(r) {
-    const muc = ds[idx].ma, msg = $("tt-msg");
+    const m = muc().ma, msg = $("tt-msg");
     msg.className = "tt-msg";
     if (!r.hop_le) { msg.textContent = r.ly_do; msg.classList.add("sai"); return; }
-    if (r.ket_luan.length === 1 && r.ket_luan[0] === muc) return thanhCong(r);
-    if (r.hinh_suy_ra.includes(muc)) {
-      msg.textContent = `Gần đúng! Đây là ${tenHinh(r.ket_luan[0])} — một trường hợp đặc biệt của ${tenHinh(muc)}. Hãy kéo để nó chỉ là ${tenHinh(muc).toLowerCase()} thôi.`;
+    if (r.ket_luan.length === 1 && r.ket_luan[0] === m) return thanhCong(r);
+    if (r.hinh_suy_ra.includes(m)) {
+      msg.textContent = `Gần đúng! Đây là ${tenHinh(r.ket_luan[0])} — một trường hợp đặc biệt của ${tenHinh(m)}. Hãy kéo để nó chỉ là ${tenHinh(m).toLowerCase()} thôi.`;
       msg.classList.add("gan");
+    } else if (r.ket_luan.length === 1 && hauDue(r.ket_luan[0]).includes(m)) {
+      // Đã thành một hình "tổ tiên" của hình cần tạo: đang đi đúng hướng
+      msg.textContent = `Đã là ${tenHinh(r.ket_luan[0]).toLowerCase()} — đang đến gần ${tenHinh(m).toLowerCase()} rồi, kéo tiếp nhé!`;
+      msg.classList.add("tien");
     } else {
       msg.textContent = `Hiện là ${r.ket_luan.map(tenHinh).join(" và ").toLowerCase()}. Chưa đúng, thử tiếp nhé!`;
       msg.classList.add("sai");
@@ -207,27 +338,35 @@ const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc,
 
   // ---------- điểm & lượt chơi ----------
   function thanhCong(r) {
-    daGiai = true;
+    daGiai = true; chon = null; ve();
     $("tt-msg").className = "tt-msg dung"; $("tt-msg").textContent = "Chính xác!";
-    const giay = Math.round((Date.now() - batDau) / 1000);
-    chuoi += 1; soCau += 1; daXong.add(ds[idx].ma); daXongVong.add(idx);
+    const giay = Math.round((Date.now() - batDau) / 1000), t = muc();
+    chuoi += 1; soCau += 1; daXong.add(t.ma);
+    if (cheDo === "vong") daXongVong.add(idx);
     let cong = 100 + Math.max(0, 60 - giay) + Math.min(50, 10 * (chuoi - 1));
     if (dungGoiY) cong = Math.floor(cong / 2);
     diem += cong; capNhatDiem();
-    const ly_do = r.cac_buoc.length ? r.cac_buoc[r.cac_buoc.length - 1].ten : "";
-    moHop("Chính xác! +" + cong + " điểm",
-      `Neo4j xác nhận đây là <b>${tenHinh(ds[idx].ma)}</b> sau ${giay} giây${dungGoiY ? " (có dùng gợi ý)" : ""}.` +
-      (ly_do ? `<br><span class="muted">Vì: ${ly_do}</span>` : ""),
-      idx + 1 < ds.length ? "Thử thách tiếp theo ⟶" : "Xem kết quả vòng ⟶", tiepTheo);
+    const lyDo = r.cac_buoc.length ? r.cac_buoc[r.cac_buoc.length - 1].ten : "";
+    const noiDung = `Neo4j xác nhận đây là <b>${esc(t.ten)}</b> sau ${giay} giây${dungGoiY ? " (có dùng gợi ý)" : ""}.` +
+      (lyDo ? `<br><span class="muted">Vì: ${esc(lyDo)}</span>` : "");
+    if (cheDo === "vong")
+      moHop("Chính xác! +" + cong + " điểm", noiDung,
+        idx + 1 < ds.length ? "Thử thách tiếp theo ⟶" : "Xem kết quả vòng ⟶", tiepTheo);
+    else
+      moHop("Chính xác! +" + cong + " điểm", noiDung, "Chơi lại đề này ⟶",
+        () => { dongHop(); luot += 1; batDauThuThach(); }, false,
+        { chu: "Đổi đề", lam: () => { dongHop(); $("tc-tu").focus(); } });
   }
   function capNhatDiem() {
     $("diem").textContent = diem; $("chuoi").textContent = chuoi; $("da-xong").textContent = soCau;
     $("tt-dots").innerHTML = ds.map((t, i) =>
-      `<span class="dot${daXongVong.has(i) ? " ok" : ""}${i === idx ? " now" : ""}" title="${t.ten}">${t.ten.replace("Hình ", "")}</span>`).join("");
+      `<span class="dot${daXongVong.has(i) ? " ok" : ""}${i === idx ? " now" : ""}" title="${esc(t.ten)}">${esc(t.ten.replace("Hình ", ""))}</span>`).join("");
   }
-  function moHop(tieuDe, noiDung, nut, hanhDong, luu) {
+  function moHop(tieuDe, noiDung, nut, hanhDong, luu, nutPhu) {
     $("md-tieu-de").textContent = tieuDe; $("md-noi-dung").innerHTML = noiDung;
     $("md-nut").textContent = nut; $("md-nut").onclick = hanhDong;
+    $("md-nut-phu").hidden = !nutPhu;
+    if (nutPhu) { $("md-nut-phu").textContent = nutPhu.chu; $("md-nut-phu").onclick = nutPhu.lam; }
     $("md-luu").hidden = !luu; $("md-nut-2").hidden = !luu;
     $("tt-modal").hidden = false; dangNghi = true;
   }
@@ -247,34 +386,74 @@ const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc,
         batDauThuThach();
       }, true);
   }
+  // Hình xuất phát: tứ giác thường (theo vòng) hoặc hình đã chọn (tự chọn), do máy chủ sinh và Neo4j kiểm tra
   async function hinhMoi() {
-    const goc0 = [135, 45, -45, -135], batDauYC = yeuCau;
-    for (let lan = 0; lan < 40; lan++) {
-      const p = goc0.map(a0 => {
-        const a = (a0 + (Math.random() * 40 - 20)) * Math.PI / 180, r = 5 + Math.random() * 5;
-        return [Math.min(COT - 1, Math.max(1, Math.round(16 + r * Math.cos(a) * 1.3))),
-                Math.min(HANG - 1, Math.max(1, Math.round(11.5 + r * Math.sin(a))))];
-      });
-      const r = await kiemTra(p);
-      if (yeuCau !== batDauYC || keo !== null) return;   // người chơi đã bắt đầu kéo
-      if (r.hop_le && r.tinh_chat.length === 0) { pts = p; ve(); ketQua = r; hienKetQua(r); return; }
-    }
+    const ma = cheDo === "vong" ? "TU_GIAC" : tuChon.tu;
+    const lan = ++lanSinh, yc = yeuCau;
+    let r;
+    try { r = await fetch("/api/thu-thach/hinh-mau?hinh=" + encodeURIComponent(ma)).then(x => x.json()); }
+    catch (e) { r = {}; }
+    if (lan !== lanSinh || yeuCau !== yc || keo) return;     // đã có yêu cầu mới hơn / người chơi đang kéo
+    if (!r.pts) { $("tt-msg").textContent = r.loi || "Không tải được hình, hãy bấm Hình mới."; return; }
+    pts = r.pts; chon = null; ve(); phanTich(false);
   }
   function batDauThuThach() {
-    const t = ds[idx];
-    daGiai = false; dungGoiY = false; batDau = Date.now();
-    $("tt-so").textContent = idx + 1; $("tt-tong").textContent = ds.length; $("tt-vong").textContent = vong;
-    $("tt-ten").textContent = t.ten.toUpperCase(); $("tt-dn").textContent = t.dinh_nghia;
-    $("tt-msg").textContent = ""; $("the-goi-y").hidden = true;
+    const t = muc();
+    daGiai = false; dungGoiY = false; batDau = Date.now(); chon = null;
+    if (cheDo === "vong") {
+      $("tt-nhan").textContent = `Thử thách ${idx + 1}/${ds.length} · Vòng ${vong}`;
+      $("tt-de").innerHTML = `Hãy kéo các đỉnh để tạo thành <span>${esc(t.ten.toUpperCase())}</span>`;
+    } else {
+      $("tt-nhan").textContent = `Tự chọn đề · Lượt ${luot}`;
+      $("tt-de").innerHTML = `Từ <span class="tu">${esc(HINH[tuChon.tu].ten.toUpperCase())}</span>, ` +
+        `hãy kéo để tạo thành <span>${esc(t.ten.toUpperCase())}</span>`;
+    }
+    $("tt-dn").textContent = t.dinh_nghia;
+    $("tt-msg").textContent = ""; $("tt-msg").className = "tt-msg"; $("the-goi-y").hidden = true;
+    $("the-tien-do").hidden = cheDo !== "vong";
     capNhatDiem(); hinhMoi();
   }
+
+  // ---------- chế độ chơi ----------
+  const tuSel = $("tc-tu"), denSel = $("tc-den");
+  DATA.tu_chon.filter(h => hauDue(h.ma).length).forEach(h => tuSel.add(new Option(h.ten, h.ma)));
+  function capNhatDen() {
+    const cu = denSel.value;
+    denSel.innerHTML = "";
+    hauDue(tuSel.value).forEach(m => denSel.add(new Option(HINH[m].ten, m)));
+    if ([...denSel.options].some(o => o.value === cu)) denSel.value = cu;
+  }
+  tuSel.addEventListener("change", capNhatDen);
+  function doiCheDo(moi) {
+    if (dangNghi) dongHop();
+    cheDo = moi;
+    document.querySelectorAll(".tt-mode").forEach(b => {
+      b.classList.toggle("act", b.dataset.cheDo === moi);
+      b.setAttribute("aria-selected", b.dataset.cheDo === moi);
+    });
+    $("tt-tuchon").hidden = moi !== "tu_chon";
+    if (moi === "tu_chon") tuChon = { tu: tuSel.value, den: denSel.value };
+    batDauThuThach();
+  }
+  document.querySelectorAll(".tt-mode").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.cheDo !== cheDo) doiCheDo(b.dataset.cheDo);
+  }));
+  $("tc-bat-dau").onclick = () => { if (dangNghi) dongHop(); tuChon = { tu: tuSel.value, den: denSel.value }; luot = 1; batDauThuThach(); };
+
   $("nut-goi-y").onclick = () => {
-    const t = ds[idx]; dungGoiY = true;
-    $("ds-goi-y").innerHTML = t.goi_y.map(d => `<li><b>${d.tu_hinh}</b> + ${d.can.join(" + ")}</li>`).join("");
+    const t = muc(); dungGoiY = true;
+    $("ds-goi-y").innerHTML = t.goi_y.length
+      ? t.goi_y.map(d => `<li><b>${esc(d.tu_hinh)}</b> + ${esc(d.can.join(" + "))}</li>`).join("")
+      : `<li class="muted">Chưa có dấu hiệu.</li>`;
     $("the-goi-y").hidden = false;
   };
   $("nut-hinh-moi").onclick = () => { if (!daGiai && !dangNghi) hinhMoi(); };
-  $("nut-bo-qua").onclick = () => { if (dangNghi) return; chuoi = 0; daGiai = false; tiepTheo(); };
+  $("nut-bo-qua").onclick = () => {
+    if (dangNghi) return;
+    chuoi = 0;
+    if (cheDo === "vong") { daGiai = false; tiepTheo(); }
+    else { luot += 1; batDauThuThach(); }
+  };
   $("nut-ket-thuc").onclick = () => moHop("Kết thúc lượt chơi",
     `Tổng điểm: <b>${diem}</b> · Số hình đã tạo đúng: <b>${soCau}</b>. Nhập tên để lưu vào bảng xếp hạng (lưu trong Neo4j).`,
     "Chơi tiếp", dongHop, true);
@@ -283,12 +462,14 @@ const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc,
     const ten = $("ten-nguoi-choi").value.trim();
     try { localStorage.setItem("tu_giac_ten", ten); } catch (e) {}
     const r = await fetch("/api/thu-thach/luu", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ten, diem, so_cau: soCau, hoan_thanh: [...daXong] }) }).then(x => x.json());
+      body: JSON.stringify({ ten, diem, so_cau: soCau, hoan_thanh: [...daXong] }) })
+      .then(x => x.json()).catch(() => ({ loi: "Không lưu được điểm, hãy thử lại sau." }));
     if (r.bxh) { veBxh(r.bxh); $("md-noi-dung").innerHTML += "<br><b class='to'>Đã lưu điểm vào Neo4j!</b>"; $("md-nut-2").hidden = true; }
+    else if (r.loi) { const e = document.createElement("div"); e.className = "muted"; e.textContent = r.loi; $("md-noi-dung").appendChild(e); }
   };
   function veBxh(hang) {
     $("bxh").innerHTML = hang.length ? hang.map((d, i) =>
-      `<tr><td>${i + 1}</td><td>${d.ten.replace(/</g, "&lt;")}</td><td><b>${d.diem}</b></td><td class="muted">${d.so_cau} hình</td></tr>`).join("")
+      `<tr><td>${i + 1}</td><td>${esc(d.ten)}</td><td><b>${d.diem}</b></td><td class="muted">${d.so_cau} hình</td></tr>`).join("")
       : `<tr><td class="muted">Chưa có ai lưu điểm.</td></tr>`;
   }
   setInterval(() => {
@@ -297,8 +478,19 @@ const DATA = {{ {"thu_thach": thu_thach, "ten_hinh": ten_hinh, "ten_tc": ten_tc,
     $("tt-time").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
   }, 500);
 
+  // ---------- khởi động ----------
   veBxh(DATA.bxh);
-  batDauThuThach();
+  const thamSo = new URLSearchParams(location.search);
+  const tuUrl = thamSo.get("tu"), denUrl = thamSo.get("den");
+  tuSel.value = HINH.HINH_BINH_HANH ? "HINH_BINH_HANH" : tuSel.options[0].value;
+  capNhatDen();
+  if (HINH.HINH_VUONG && [...denSel.options].some(o => o.value === "HINH_VUONG")) denSel.value = "HINH_VUONG";
+  if (tuUrl && HINH[tuUrl] && hauDue(tuUrl).includes(denUrl)) {
+    tuSel.value = tuUrl; capNhatDen(); denSel.value = denUrl;
+    doiCheDo("tu_chon");
+  } else {
+    batDauThuThach();
+  }
 })();
 </script>
 {% endblock %}

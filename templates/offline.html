@@ -4,8 +4,9 @@
   <h2>Không truy vấn được Neo4j</h2>
   <div class="alert err">{{ loi }}</div>
   <ol>
-    <li>Kiểm tra Neo4j đang chạy: <code>docker ps</code> (hoặc <code>docker start neo4j</code>).</li>
-    <li>Kiểm tra địa chỉ và mật khẩu trong file <code>.env</code> (hiện tại: <code>{{ uri }}</code>).</li>
+    <li>Kiểm tra Neo4j đang chạy: <code>docker ps</code> (hoặc <code>docker start neo4j</code>).
+      Nếu dùng Neo4j Aura: vào console.neo4j.io xem instance có đang bị tạm dừng (Paused) không, bấm Resume.</li>
+    <li>Kiểm tra địa chỉ và mật khẩu trong file <code>.env</code> hoặc biến môi trường trên máy chủ (hiện tại: <code>{{ uri }}</code>).</li>
     <li>Nạp tri thức: <code>python -m src.seed</code></li>
   </ol>
 </div>
